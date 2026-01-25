@@ -15,6 +15,6 @@ const ProgressModal = () => {
             <Progress percent={progress ?? 0} />
         </Modal>
     );
-}
+};
 
 export default ProgressModal;

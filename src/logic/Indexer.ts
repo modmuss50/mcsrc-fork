@@ -1,6 +1,6 @@
-import JSZip from 'jszip';
 import { BehaviorSubject, map } from 'rxjs';
-import { decompileClass } from './Decompiler';
+import { decompileClass, DECOMPILER_OPTIONS } from './Decompiler';
+import type { Jar } from '../utils/Jar';
 
 export interface IndexProgress {
     current: number;
@@ -17,7 +17,7 @@ export const isIndexing = indexProgress.pipe(
 
 let isRunning = false;
 
-export async function refreshIndex(jar: JSZip): Promise<void> {
+export async function refreshIndex(jar: Jar): Promise<void> {
     if (isRunning) {
         throw new Error("Indexing is already in progress");
     }
@@ -25,13 +25,13 @@ export async function refreshIndex(jar: JSZip): Promise<void> {
     isRunning = true;
 
     try {
-        const classesToIndex = Object.keys(jar.files).filter(file => file.endsWith('.class') && !file.includes('$'));
+        const classesToIndex = Object.keys(jar.entries).filter(file => file.endsWith('.class') && !file.includes('$'));
         indexProgress.next({ current: 0, total: classesToIndex.length, name: "" });
 
         for (const [index, className] of classesToIndex.entries()) {
             indexProgress.next({ ...indexProgress.value, current: index + 1, name: className });
 
-            const source = await decompileClass(className, jar, {});
+            const result = await decompileClass(className, jar, DECOMPILER_OPTIONS);
             console.log(`Decompiled ${className}`);
         }
     } finally {

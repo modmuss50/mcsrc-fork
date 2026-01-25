@@ -1,59 +1,137 @@
-import { Button, Modal, type CheckboxProps } from "antd";
-import { useState } from "react";
+import { Button, Modal, type CheckboxProps, Form, Tooltip } from "antd";
 import { SettingOutlined } from '@ant-design/icons';
 import { Checkbox } from 'antd';
 import { useObservable } from "../utils/UseObservable";
-import { BooleanSetting, removeImports } from "../logic/Settings";
+import { BooleanSetting, enableTabs, displayLambdas, focusSearch, KeybindSetting, type KeybindValue, bytecode, showStructure } from "../logic/Settings";
+import { capturingKeybind, rawKeydownEvent } from "../logic/Keybinds";
+import { BehaviorSubject } from "rxjs";
 import { minecraftJar } from "../logic/MinecraftApi";
 import { refreshIndex } from "../logic/Indexer";
 
+export const settingsModalOpen = new BehaviorSubject<boolean>(false);
+
+export const SettingsModalButton = () => {
+    return (
+        <Button type="default" onClick={() => settingsModalOpen.next(true)}>
+            <SettingOutlined />
+        </Button>
+    );
+};
+
 const SettingsModal = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const isModalOpen = useObservable(settingsModalOpen);
+    const displayLambdasValue = useObservable(displayLambdas.observable);
+    const bytecodeValue = useObservable(bytecode.observable);
     const jar = useObservable(minecraftJar);
 
     const doIndex = async () => {
         if (jar) {
-            refreshIndex(jar)
-            setIsModalOpen(false);
+            await refreshIndex(jar.jar);
+            settingsModalOpen.next(false);
         }
-    }
+    };
 
     return (
-        <>
-            <Button type="default" onClick={() => setIsModalOpen(true)}>
-                <SettingOutlined />
-            </Button>
-            <Modal
-                title="Settings"
-                open={isModalOpen}
-                onCancel={() => setIsModalOpen(false)}
-                footer={null}
-            >
-                <Setting setting={removeImports} title={"Hide imports"} />
+        <Modal
+            title="Settings"
+            open={isModalOpen}
+            onCancel={() => settingsModalOpen.next(false)}
+            footer={null}
+        >
+            <Form layout="horizontal" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
+                <BooleanToggle setting={enableTabs} title={"Enable Tabs"} />
+                <BooleanToggle setting={displayLambdas} title={"Lambda Names"} tooltip="Display lambda names as inline comments. Does not support permalinking." disabled={bytecodeValue} />
+                <BooleanToggle setting={bytecode} title={"Show Bytecode"} tooltip="Show bytecode instructions alongside decompiled source. Does not support permalinking." disabled={displayLambdasValue} />
+                <KeybindControl setting={focusSearch} title={"Focus Search"} captureId="focus_search" />
+                <KeybindControl setting={showStructure} title={"Show Structure"} captureId="show_structure" />
                 {jar && (
-                    <Button type="default" onClick={doIndex} style={{ marginLeft: '8px' }}>
-                        Re-index Jar
-                    </Button>
+                    <Form.Item label="Decompile All">
+                        <Button type="default" onClick={doIndex}>
+                            Start
+                        </Button>
+                    </Form.Item>
                 )}
-            </Modal>
-        </>
+            </Form>
+        </Modal>
     );
-}
+};
 
-interface SettingProps {
+interface BooleanToggleProps {
     setting: BooleanSetting;
     title: string;
+    tooltip?: string;
+    disabled?: boolean;
 }
 
-const Setting: React.FC<SettingProps> = ({ setting, title }) => {
+const BooleanToggle: React.FC<BooleanToggleProps> = ({ setting, title, tooltip, disabled }) => {
     const value = useObservable(setting.observable);
     const onChange: CheckboxProps['onChange'] = (e) => {
         setting.value = e.target.checked;
     };
 
+    const checkbox = <Checkbox checked={value} onChange={onChange} disabled={disabled} />;
+
     return (
-        <Checkbox checked={value} onChange={onChange}>{title}</Checkbox>
+        <Form.Item label={title}>
+            {tooltip ? <Tooltip title={tooltip}>{checkbox}</Tooltip> : checkbox}
+        </Form.Item>
     );
+};
+
+interface KeybindProps {
+    setting: KeybindSetting;
+    title: string;
+    captureId: string;
 }
+
+const KeybindControl: React.FC<KeybindProps> = ({ setting, title, captureId }) => {
+    const value = useObservable(setting.observable);
+    const capturing = useObservable(capturingKeybind);
+    const isCapturing = capturing === captureId;
+
+    const startCapture = () => {
+        if (capturingKeybind.value !== null) {
+            return;
+        }
+        capturingKeybind.next(captureId);
+        const subscription = rawKeydownEvent.subscribe((event) => {
+            event.preventDefault();
+
+            // Only capture if a non-modifier key is pressed
+            const modifierKeys = ['Control', 'Alt', 'Shift', 'Meta'];
+            if (!modifierKeys.includes(event.key)) {
+                setting.setFromEvent(event);
+                capturingKeybind.next(null);
+                subscription.unsubscribe();
+            }
+        });
+    };
+
+    const formatKeybind = (keybind: KeybindValue | undefined): string => {
+        if (!keybind) return 'Not set';
+        return keybind.split('+').map(k => {
+            if (k == ' ') return '<space>';
+            const key = k.trim();
+            return key.charAt(0).toUpperCase() + key.slice(1);
+        }).join('+');
+    };
+
+    return (
+        <Form.Item label={title}>
+            <Button
+                onClick={startCapture}
+                type={isCapturing ? 'primary' : 'default'}
+            >
+                {isCapturing ? 'Press keys...' : formatKeybind(value)}
+            </Button>
+            <Button
+                onClick={() => setting.reset()}
+                style={{ marginLeft: '8px' }}
+            >
+                Reset
+            </Button>
+        </Form.Item>
+    );
+};
 
 export default SettingsModal;
