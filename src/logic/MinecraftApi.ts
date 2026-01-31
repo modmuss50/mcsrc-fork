@@ -19,6 +19,14 @@ interface VersionListEntry {
     sha1: string;
 }
 
+interface VersionLibrary {
+    downloads?: {
+        artifact?: {
+            url?: string;
+        };
+    };
+}
+
 interface VersionManifest {
     id: string;
     downloads: {
@@ -27,12 +35,14 @@ interface VersionManifest {
             sha1: string;
         };
     };
+    libraries: VersionLibrary[];
 }
 
 export interface MinecraftJar {
     version: string;
     jar: Jar;
     blob: Blob;
+    versionManifest: VersionManifest;
 }
 
 export const minecraftVersions = new BehaviorSubject<VersionListEntry[]>([]);
@@ -125,7 +135,7 @@ async function downloadMinecraftJar(version: VersionListEntry, progress: Behavio
         const blob = await response.blob();
         const jar = await openJar(blob);
         progress.next(undefined);
-        return { version: version.id, jar, blob };
+        return { version: version.id, jar, blob, versionManifest };
     }
 
     const reader = response.body.getReader();
@@ -146,7 +156,7 @@ async function downloadMinecraftJar(version: VersionListEntry, progress: Behavio
     const blob = new Blob(chunks);
     const jar = await openJar(blob);
     progress.next(undefined);
-    return { version: version.id, jar, blob };
+    return { version: version.id, jar, blob, versionManifest };
 }
 
 async function initialize(version: string | null = null) {

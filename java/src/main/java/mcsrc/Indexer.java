@@ -1,5 +1,7 @@
 package mcsrc;
 
+import mcsrc.unpick.UnpickHelper;
+import mcsrc.unpick.UnpickOptions;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.Textifier;
@@ -90,7 +92,12 @@ public class Indexer {
         }
         return result.toArray(new String[0]);
     }
-    
+
+    @JSExport
+    public static Int8Array unpick(String className, String definition, UnpickOptions options) {
+        return UnpickHelper.unpick(className, definition, options);
+    }
+
     private static class ClassInheritanceInfo {
         String className;
         String superName;

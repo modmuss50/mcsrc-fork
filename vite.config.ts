@@ -20,6 +20,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/libraries': {
+        target: 'https://libraries.minecraft.net/',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/libraries/, ''),
+      },
     },
   },
   build: {

@@ -1,7 +1,7 @@
 import { BehaviorSubject, distinctUntilChanged, map, shareReplay } from "rxjs";
 import { endpointSymbol } from "vite-plugin-comlink/symbol";
 import { minecraftJar, type MinecraftJar } from "../logic/MinecraftApi";
-import type { ClassDataString } from "./JarIndexWorker";
+import type { ClassDataString } from "./JavaDef";
 
 export type Class = string;
 export type Method = `${string}:${string}:${string}`;

@@ -10,6 +10,7 @@ import type { Jar } from "../utils/Jar";
 import type { Token } from "./Tokens";
 import { bytecode, displayLambdas } from "./Settings";
 import { getBytecode } from "../workers/JarIndex";
+import { unpick } from "../workers/Unpick";
 
 export interface DecompileResult {
     className: string;
@@ -64,7 +65,7 @@ export function decompileResultPipeline(jar: Observable<MinecraftJar>): Observab
                 options["mark-corresponding-synthetics"] = "1";
             }
 
-            return from(decompileClass(className, jar.jar, options)).pipe(
+            return from(decompileClass(className, jar, options)).pipe(
                 tap(result => {
                     // Store DecompilationResult in in-memory cache
                     if (decompilationCache.size >= 75) {
@@ -83,7 +84,8 @@ export const currentSource = currentResult.pipe(
     map(result => result.source)
 );
 
-export async function decompileClass(className: string, jar: Jar, options: Options): Promise<DecompileResult> {
+export async function decompileClass(className: string, minecraftJar: MinecraftJar, options: Options): Promise<DecompileResult> {
+    const jar = minecraftJar.jar;
     console.log(`Decompiling class: '${className}'`);
 
     const files = Object.keys(jar.entries);
@@ -95,6 +97,8 @@ export async function decompileClass(className: string, jar: Jar, options: Optio
 
     try {
         decompilerCounter.next(decompilerCounter.value + 1);
+
+        const unpicked = await unpick(className, "", minecraftJar);
 
         const tokens: Token[] = [];
         const source = await decompile(className.replace(".class", ""), {

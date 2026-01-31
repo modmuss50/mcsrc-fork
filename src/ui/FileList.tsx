@@ -78,7 +78,7 @@ function getPathKeys(filePath: string): Key[] {
 const handleCopyContent = async (path: string, jar: MinecraftJar) => {
     try {
         message.loading({ content: 'Decompiling...', key: 'copy-content' });
-        const result = await decompileClass(path, jar.jar, DECOMPILER_OPTIONS);
+        const result = await decompileClass(path, jar, DECOMPILER_OPTIONS);
         await navigator.clipboard.writeText(result.source);
         message.success({ content: 'Content copied to clipboard', key: 'copy-content' });
     } catch (e) {

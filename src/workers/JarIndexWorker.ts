@@ -2,8 +2,7 @@ import { load } from "../../java/build/generated/teavm/wasm-gc/java.wasm-runtime
 import indexerWasm from '../../java/build/generated/teavm/wasm-gc/java.wasm?url';
 import { openJar, type Jar } from "../utils/Jar.js";
 import type { UsageKey, UsageString } from "./JarIndex.js";
-
-export type ClassDataString = `${string}|${string}|${number}|${string}`;
+import type { ClassDataString, Indexer } from "./JavaDef.js";
 
 let indexerFunc: Indexer | null = null;
 
@@ -69,11 +68,3 @@ export const getClassData = async (): Promise<ClassDataString[]> => {
     const indexer = await getIndexer();
     return indexer.getClassData();
 };
-
-interface Indexer {
-    index(data: ArrayBufferLike): void;
-    getUsage(key: UsageKey): [UsageString];
-    getUsageSize(): number;
-    getBytecode(classData: ArrayBufferLike[]): string;
-    getClassData(): ClassDataString[];
-}
