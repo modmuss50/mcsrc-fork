@@ -1,15 +1,12 @@
 import { combineLatest } from "rxjs";
 import { resetPermalinkAffectingSettings, supportsPermalinking } from "./Settings";
-import { diffView, selectedFile, selectedLines, selectedMinecraftVersion } from "./State";
+import { diffView, selectedFile, selectedLines, selectedMinecraftVersion, type Selection } from "./State";
 
 export interface State {
     version: number; // Allows us to change the permalink structure in the future
     minecraftVersion: string;
     file: string;
-    selectedLines: {
-        line: number;
-        lineEnd?: number;
-    } | null;
+    selectedLines: Selection | null;
 }
 
 const DEFAULT_STATE: State = {
@@ -20,16 +17,34 @@ const DEFAULT_STATE: State = {
 };
 
 export const parsePathToState = (path: string): State | null => {
-    // Check for line number marker (e.g., #L123 or #L10-20)
-    let lineNumber: number | null = null;
-    let lineEnd: number | null = null;
+    let selection: Selection | null = null;
+
+    // Check for line number marker first (e.g., #L123 or #L10-20)
     const lineMatch = path.match(/(?:#|%23)L(\d+)(?:-(\d+))?$/);
     if (lineMatch) {
-        lineNumber = parseInt(lineMatch[1], 10);
-        if (lineMatch[2]) {
-            lineEnd = parseInt(lineMatch[2], 10);
-        }
+        const lineNumber = parseInt(lineMatch[1], 10);
+        const lineEnd = lineMatch[2] ? parseInt(lineMatch[2], 10) : undefined;
+        selection = {
+            type: 'lines',
+            line: lineNumber,
+            lineEnd
+        };
         path = path.substring(0, lineMatch.index);
+    } else {
+        // Check for token-based marker (e.g., #methodName(descriptor) or #fieldName)
+        // Method descriptors always start with '(', so we can distinguish them from fields
+        const tokenMatch = path.match(/(?:#|%23)([a-zA-Z_$][a-zA-Z0-9_$]*)(\(.+)?$/);
+        if (tokenMatch) {
+            const tokenName = tokenMatch[1];
+            const tokenDescriptor = tokenMatch[2];
+            selection = {
+                type: 'token',
+                tokenType: tokenDescriptor ? 'method' : 'field',
+                tokenName,
+                tokenDescriptor
+            };
+            path = path.substring(0, tokenMatch.index);
+        }
     }
 
     const segments = path.split('/').filter(s => s.length > 0);
@@ -47,12 +62,14 @@ export const parsePathToState = (path: string): State | null => {
         minecraftVersion = "25w45a_unobfuscated";
     }
 
-    return {
+    const result = {
         version,
         minecraftVersion,
         file: filePath + (filePath.endsWith('.class') ? '' : '.class'),
-        selectedLines: lineNumber ? { line: lineNumber, lineEnd: lineEnd || undefined } : null
+        selectedLines: selection
     };
+
+    return result;
 };
 
 export const getInitialState = (): State => {
@@ -66,8 +83,8 @@ export const getInitialState = (): State => {
         ? pathname.slice(1) // Remove leading /
         : (hash.startsWith('#/') ? hash.slice(2) : (hash.startsWith('#') ? hash.slice(1) : ''));
 
-    // For new style (pathname-based), append hash if it contains line number
-    if (newStyle && hash.startsWith('#L')) {
+    // For new style (pathname-based), append hash if it contains line number or token
+    if (newStyle && hash.startsWith('#')) {
         path += hash;
     }
 
@@ -112,11 +129,21 @@ if (typeof window !== "undefined") {
             let url = `/1/${minecraftVersion}/${file.replace(".class", "")}`;
 
             if (selectedLines) {
-                const { line, lineEnd } = selectedLines;
-                if (lineEnd && lineEnd !== line) {
-                    url += `#L${Math.min(line, lineEnd)}-${Math.max(line, lineEnd)}`;
+                if (selectedLines.type === 'token') {
+                    // Token-based permalink
+                    if (selectedLines.tokenType === 'method' && selectedLines.tokenDescriptor) {
+                        url += `#${selectedLines.tokenName}${selectedLines.tokenDescriptor}`;
+                    } else if (selectedLines.tokenType === 'field') {
+                        url += `#${selectedLines.tokenName}`;
+                    }
                 } else {
-                    url += `#L${line}`;
+                    // Line-based permalink
+                    const { line, lineEnd } = selectedLines;
+                    if (lineEnd && lineEnd !== line) {
+                        url += `#L${Math.min(line, lineEnd)}-${Math.max(line, lineEnd)}`;
+                    } else {
+                        url += `#L${line}`;
+                    }
                 }
             }
 

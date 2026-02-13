@@ -27,7 +27,7 @@ export function jumpToToken(
     targetType: 'method' | 'field' | 'class',
     target: string,
     editor: editor.ICodeEditor
-) {
+): number | null {
     for (const token of result.tokens) {
         if (!(token.declaration && token.type == targetType)) continue;
 
@@ -46,10 +46,11 @@ export function jumpToToken(
         const { line, column } = getTokenLocation(result, token);
         editor.setSelection(new Range(line, column, line, column + token.length));
         editor.revealLineInCenter(line, 0);
-        break;
+        return line;
     }
 
     console.warn(`jumpToToken: Target ${targetType} "${target}" not found in ${result.className}`);
+    return null;
 }
 
 export function createDefinitionProvider(

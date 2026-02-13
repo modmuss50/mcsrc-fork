@@ -51,6 +51,7 @@ const Code = () => {
     const lineHighlightRef = useRef<editor.IEditorDecorationsCollection | null>(null);
     const decompileResultRef = useRef(decompileResult);
     const classListRef = useRef(classList);
+    const lastJumpedToken = useRef<string | null>(null);
 
     const [messageApi, contextHolder] = message.useMessage();
 
@@ -153,7 +154,7 @@ const Code = () => {
         }, [monaco, editorRef.current, decompileResult]);
     }
 
-    // Scroll to top when source changes, or to specific line if specified
+    // Scroll to top when source changes, or to specific line/token if specified
     useEffect(() => {
         if (editorRef.current && decompileResult) {
             const editor = editorRef.current;
@@ -164,11 +165,13 @@ const Code = () => {
             }
 
             lineHighlightRef.current?.clear();
+            // Reset the last jumped token when file changes
+            lastJumpedToken.current = null;
 
             const executeScroll = () => {
-                const currentLine = selectedLine?.line;
-                if (currentLine) {
-                    const lineEnd = selectedLine?.lineEnd ?? currentLine;
+                if (selectedLine?.type === 'lines') {
+                    const currentLine = selectedLine.line;
+                    const lineEnd = selectedLine.lineEnd ?? currentLine;
                     editor.setSelection(new Range(currentLine, 1, currentLine, 1));
                     editor.revealLinesInCenterIfOutsideViewport(currentLine, lineEnd);
 
@@ -181,6 +184,30 @@ const Code = () => {
                             glyphMarginClassName: 'highlighted-line-glyph'
                         }
                     }]);
+                } else if (selectedLine?.type === 'token') {
+                    // Token-based permalink - jump to the token
+                    // Only jump if we haven't already jumped to this token
+                    const tokenKey = `${selectedLine.tokenType}:${selectedLine.tokenName}:${selectedLine.tokenDescriptor || ''}`;
+                    if (lastJumpedToken.current !== tokenKey) {
+                        const target = selectedLine.tokenType === 'method' && selectedLine.tokenDescriptor
+                            ? `${selectedLine.tokenName}:${selectedLine.tokenDescriptor}`
+                            : selectedLine.tokenName;
+                        const line = jumpToToken(decompileResult, selectedLine.tokenType, target, editor);
+                        
+                        // Highlight the line containing the token
+                        if (line !== null) {
+                            lineHighlightRef.current = editor.createDecorationsCollection([{
+                                range: new Range(line, 1, line, 1),
+                                options: {
+                                    isWholeLine: true,
+                                    className: 'highlighted-line',
+                                    glyphMarginClassName: 'highlighted-line-glyph'
+                                }
+                            }]);
+                        }
+                        
+                        lastJumpedToken.current = tokenKey;
+                    }
                 } else if (currentTab && currentTab.scroll > 0) {
                     editor.setScrollTop(currentTab.scroll);
                 } else {
@@ -193,7 +220,7 @@ const Code = () => {
                 executeScroll();
             });
         }
-    }, [decompileResult, selectedLine]);
+    }, [decompileResult, selectedLine]);  // Depend on both to handle line selections
 
     // Scroll to a "Find usages" token
     useEffect(() => {
@@ -309,7 +336,40 @@ const Code = () => {
         if (decompileResult.className + ".class" === tokenJump.className) {
             requestAnimationFrame(() => {
                 if (editorRef.current && decompileResult) {
-                    jumpToToken(decompileResult, tokenJump.targetType, tokenJump.target, editorRef.current);
+                    const line = jumpToToken(decompileResult, tokenJump.targetType, tokenJump.target, editorRef.current);
+                    
+                    // Highlight the line containing the token
+                    if (line !== null) {
+                        lineHighlightRef.current?.clear();
+                        lineHighlightRef.current = editorRef.current.createDecorationsCollection([{
+                            range: new Range(line, 1, line, 1),
+                            options: {
+                                isWholeLine: true,
+                                className: 'highlighted-line',
+                                glyphMarginClassName: 'highlighted-line-glyph'
+                            }
+                        }]);
+                        
+                        // Update state to reflect the token jump
+                        if (tokenJump.targetType === 'method') {
+                            // target format is "methodName:descriptor"
+                            const [methodName, descriptor] = tokenJump.target.split(':');
+                            selectedLines.next({
+                                type: 'token',
+                                tokenType: 'method',
+                                tokenName: methodName,
+                                tokenDescriptor: descriptor
+                            });
+                        } else if (tokenJump.targetType === 'field') {
+                            selectedLines.next({
+                                type: 'token',
+                                tokenType: 'field',
+                                tokenName: tokenJump.target,
+                                tokenDescriptor: undefined
+                            });
+                        }
+                    }
+                    
                     clearTokenJump();
                 }
             });
@@ -326,13 +386,31 @@ const Code = () => {
                 e.target.type === editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
                 const lineNumber = e.target.position?.lineNumber;
 
-                if (lineNumber) {
-                    // Shift-click to select a range
-                    console.log(selectedLine);
-                    if (e.event.shiftKey && selectedLine) {
-                        selectedLines.next({ line: selectedLine.line, lineEnd: lineNumber });
+                if (lineNumber && decompileResult) {
+                    // Check for single declaration token on this line
+                    const lineTokens = decompileResult.tokens.filter(token => {
+                        const { line } = getTokenLocation(decompileResult, token);
+                        return line === lineNumber && token.declaration && 
+                               (token.type === 'method' || token.type === 'field');
+                    });
+
+                    // Shift-click to select a range (line-based only)
+                    if (e.event.shiftKey && selectedLine && selectedLine.type === 'lines') {
+                        selectedLines.next({ type: 'lines', line: selectedLine.line, lineEnd: lineNumber });
+                    } else if (lineTokens.length === 1) {
+                        // Single declaration token - use token-based selection
+                        const token = lineTokens[0];
+                        if ('name' in token) {
+                            selectedLines.next({
+                                type: 'token',
+                                tokenType: token.type as 'method' | 'field',
+                                tokenName: token.name,
+                                tokenDescriptor: 'descriptor' in token ? token.descriptor : undefined
+                            });
+                        }
                     } else {
-                        selectedLines.next({ line: lineNumber });
+                        // No token or multiple tokens - use line-based selection
+                        selectedLines.next({ type: 'lines', line: lineNumber });
                     }
                 }
             }
@@ -341,7 +419,7 @@ const Code = () => {
         return () => {
             onMouseDown.dispose();
         };
-    }, [editorRef.current, selectedLine]);
+    }, [editorRef.current, selectedLine, decompileResult]);
 
     return (
         <Spin

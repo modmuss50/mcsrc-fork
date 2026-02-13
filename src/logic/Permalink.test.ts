@@ -65,6 +65,7 @@ describe('Permalink', () => {
                 const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting#L123')!;
 
                 expect(state.selectedLines).toEqual({
+                    type: 'lines',
                     line: 123,
                     lineEnd: undefined
                 });
@@ -74,6 +75,7 @@ describe('Permalink', () => {
                 const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting#L10-20')!;
 
                 expect(state.selectedLines).toEqual({
+                    type: 'lines',
                     line: 10,
                     lineEnd: 20
                 });
@@ -83,6 +85,7 @@ describe('Permalink', () => {
                 const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting%23L50')!;
 
                 expect(state.selectedLines).toEqual({
+                    type: 'lines',
                     line: 50,
                     lineEnd: undefined
                 });
@@ -92,6 +95,7 @@ describe('Permalink', () => {
                 const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting%23L10-20')!;
 
                 expect(state.selectedLines).toEqual({
+                    type: 'lines',
                     line: 10,
                     lineEnd: 20
                 });
@@ -102,6 +106,7 @@ describe('Permalink', () => {
 
                 expect(state.file).toBe('net/minecraft/world/entity/player/Player.class');
                 expect(state.selectedLines).toEqual({
+                    type: 'lines',
                     line: 456,
                     lineEnd: undefined
                 });
@@ -141,6 +146,7 @@ describe('Permalink', () => {
 
                 expect(state.minecraftVersion).toBe('25w45a_unobfuscated');
                 expect(state.selectedLines).toEqual({
+                    type: 'lines',
                     line: 100,
                     lineEnd: undefined
                 });
@@ -155,8 +161,93 @@ describe('Permalink', () => {
                 expect(state.minecraftVersion).toBe('1.21.4');
                 expect(state.file).toBe('net/minecraft/server/MinecraftServer.class');
                 expect(state.selectedLines).toEqual({
+                    type: 'lines',
                     line: 250,
                     lineEnd: 260
+                });
+            });
+        });
+
+        describe('Token-based Permalinks', () => {
+            it('should parse method token with descriptor', () => {
+                const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting#getName(Ljava/lang/String;)V')!;
+
+                expect(state.version).toBe(1);
+                expect(state.minecraftVersion).toBe('1.21');
+                expect(state.file).toBe('net/minecraft/ChatFormatting.class');
+                expect(state.selectedLines).toEqual({
+                    type: 'token',
+                    tokenType: 'method',
+                    tokenName: 'getName',
+                    tokenDescriptor: '(Ljava/lang/String;)V'
+                });
+            });
+
+            it('should parse field token without descriptor', () => {
+                const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting#RED')!;
+
+                expect(state.version).toBe(1);
+                expect(state.minecraftVersion).toBe('1.21');
+                expect(state.file).toBe('net/minecraft/ChatFormatting.class');
+                expect(state.selectedLines).toEqual({
+                    type: 'token',
+                    tokenType: 'field',
+                    tokenName: 'RED',
+                    tokenDescriptor: undefined
+                });
+            });
+
+            it('should handle URL-encoded token marker (%23)', () => {
+                const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting%23getName(Ljava/lang/String;)V')!;
+
+                expect(state.selectedLines).toEqual({
+                    type: 'token',
+                    tokenType: 'method',
+                    tokenName: 'getName',
+                    tokenDescriptor: '(Ljava/lang/String;)V'
+                });
+            });
+
+            it('should handle methods with complex descriptors', () => {
+                const state = parsePathToState('1/1.21/net/minecraft/world/entity/Entity#method_123(ILjava/util/List<Ljava/lang/String;>;)Z')!;
+
+                expect(state.selectedLines).toEqual({
+                    type: 'token',
+                    tokenType: 'method',
+                    tokenName: 'method_123',
+                    tokenDescriptor: '(ILjava/util/List<Ljava/lang/String;>;)Z'
+                });
+            });
+
+            it('should handle fields with underscores and numbers', () => {
+                const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting#FIELD_NAME_123')!;
+
+                expect(state.selectedLines).toEqual({
+                    type: 'token',
+                    tokenType: 'field',
+                    tokenName: 'FIELD_NAME_123',
+                    tokenDescriptor: undefined
+                });
+            });
+
+            it('should prefer token parsing over line parsing when token pattern matches', () => {
+                const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting#getValue(I)V')!;
+
+                expect(state.selectedLines).toEqual({
+                    type: 'token',
+                    tokenType: 'method',
+                    tokenName: 'getValue',
+                    tokenDescriptor: '(I)V'
+                });
+            });
+
+            it('should fall back to line parsing when L prefix is present', () => {
+                const state = parsePathToState('1/1.21/net/minecraft/ChatFormatting#L123')!;
+
+                expect(state.selectedLines).toEqual({
+                    type: 'lines',
+                    line: 123,
+                    lineEnd: undefined
                 });
             });
         });

@@ -10,16 +10,28 @@ const initialState = getInitialState();
 export const selectedMinecraftVersion = new BehaviorSubject<string | null>(initialState.minecraftVersion);
 
 export const selectedFile = new BehaviorSubject<string>(initialState.file);
+
 export const openTabs = new BehaviorSubject<Tab[]>([new Tab(initialState.file)]);
 export const tabHistory = new BehaviorSubject<string[]>([initialState.file]);
 export const searchQuery = new BehaviorSubject("");
 export const usageQuery = new BehaviorSubject("");
 
 export interface SelectedLines {
+  type: 'lines';
   line: number;
   lineEnd?: number;
 }
-export const selectedLines = new BehaviorSubject<SelectedLines | null>(initialState.selectedLines);
+
+export interface SelectedToken {
+  type: 'token';
+  tokenType: 'method' | 'field';
+  tokenName: string;
+  tokenDescriptor?: string; // Only for methods
+}
+
+export type Selection = SelectedLines | SelectedToken;
+
+export const selectedLines = new BehaviorSubject<Selection | null>(initialState.selectedLines);
 
 export const diffView = new BehaviorSubject<boolean>(false);
 export const diffLeftselectedMinecraftVersion = new BehaviorSubject<string | null>(null);
