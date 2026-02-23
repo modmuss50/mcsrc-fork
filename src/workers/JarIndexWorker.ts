@@ -70,10 +70,16 @@ export const getClassData = async (): Promise<ClassDataString[]> => {
     return indexer.getClassData();
 };
 
+export const remapJar = async (jarData: ArrayBufferLike, mappings: string): Promise<Int8Array> => {
+    const indexer = await getIndexer();
+    return indexer.remapJar(jarData, mappings);
+};
+
 interface Indexer {
     index(data: ArrayBufferLike): void;
     getReference(key: ReferenceKey): [ReferenceString];
     getReferenceSize(): number;
     getBytecode(classData: ArrayBufferLike[]): string;
     getClassData(): ClassDataString[];
+    remapJar(jarData: ArrayBufferLike, mappings: string): Int8Array;
 }

@@ -8,6 +8,7 @@ import org.teavm.jso.JSExport;
 import org.teavm.jso.typedarrays.ArrayBuffer;
 import org.teavm.jso.typedarrays.Int8Array;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.*;
@@ -89,6 +90,17 @@ public class Indexer {
             result.add(sb.toString());
         }
         return result.toArray(new String[0]);
+    }
+
+    @JSExport
+    public static Int8Array remapJar(ArrayBuffer jarBuffer, String mappings) {
+        byte[] bytes = new Int8Array(jarBuffer).copyToJavaArray();
+
+        try {
+            return Int8Array.copyFromJavaArray(Remapper.remapJar(bytes, mappings));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
     
     private static class ClassInheritanceInfo {

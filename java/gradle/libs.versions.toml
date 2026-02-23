@@ -1,12 +1,14 @@
 [versions]
 asm = "9.9.1"
 teavm = "0.13.0"
+tiny-remapper = "0.13.0+local"
 
 [libraries]
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 asm-util = { module = "org.ow2.asm:asm-util", version.ref = "asm" }
 teavm-core = { group = "org.teavm", name = "teavm-core", version.ref = "teavm" }
 teavm-jso = { group = "org.teavm", name = "teavm-jso-apis", version.ref = "teavm" }
+tiny-remapper = { module = "net.fabricmc:tiny-remapper", version.ref = "tiny-remapper" }
 
 [plugins]
 teavm = { id = "org.teavm", version.ref = "teavm" }

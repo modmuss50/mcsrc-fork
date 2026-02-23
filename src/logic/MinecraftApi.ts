@@ -2,6 +2,7 @@ import { BehaviorSubject, combineLatest, distinctUntilChanged, filter, from, map
 import { agreedEula } from "./Settings";
 import { openJar, type Jar } from "../utils/Jar";
 import { selectedMinecraftVersion } from "./State";
+import { remapJar } from "../workers/JarIndexWorker";
 
 const CACHE_NAME = 'mcsrc-v1';
 const VERSIONS_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
@@ -33,6 +34,7 @@ export interface MinecraftJar {
     version: string;
     jar: Jar;
     blob: Blob;
+    mappings: string | null;
 }
 
 export const minecraftVersions = agreedEula.observable.pipe(
@@ -70,6 +72,7 @@ export function minecraftJarPipeline(source$: Observable<string | null>): Observ
         filter((version) => version !== undefined),
         tap((version) => console.log(`Opening Minecraft jar ${version.id}`)),
         switchMap(version => from(downloadMinecraftJar(version, downloadProgress))),
+        switchMap(jar => from(remapJarIfNeeded(jar))),
         shareReplay({ bufferSize: 1, refCount: false })
     );
 }
@@ -87,12 +90,7 @@ async function getJson<T>(url: string): Promise<T> {
 
 async function fetchVersions(): Promise<VersionsList> {
     const mojang = await getJson<VersionsList>(VERSIONS_URL);
-    const filteredMojangVersions = mojang.versions.filter(v => {
-        const match = v.id.match(/^(\d+)\.(\d+)/);
-        if (!match) return false;
-        const major = parseInt(match[1], 10);
-        return major >= 26;
-    });
+    const filteredMojangVersions = mojang.versions;
     const versions = filteredMojangVersions
         .concat(EXPERIMENTAL_VERSIONS.versions)
         .sort((a, b) => b.releaseTime.localeCompare(a.releaseTime));
@@ -126,6 +124,7 @@ async function cachedFetch(url: string): Promise<Response> {
 async function downloadMinecraftJar(version: VersionListEntry, progress: BehaviorSubject<number | undefined>): Promise<MinecraftJar> {
     console.log(`Downloading Minecraft jar for version: ${version.id}`);
     const versionManifest = await fetchVersionManifest(version);
+    const mappings = await getMappings(versionManifest);
     const response = await cachedFetch(versionManifest.downloads.client.url);
     if (!response.ok) {
         throw new Error(`Failed to download Minecraft jar: ${response.statusText}`);
@@ -138,7 +137,7 @@ async function downloadMinecraftJar(version: VersionListEntry, progress: Behavio
         const blob = await response.blob();
         const jar = await openJar(version.id, blob);
         progress.next(undefined);
-        return { version: version.id, jar, blob };
+        return { version: version.id, jar, blob, mappings };
     }
 
     const reader = response.body.getReader();
@@ -159,7 +158,32 @@ async function downloadMinecraftJar(version: VersionListEntry, progress: Behavio
     const blob = new Blob(chunks);
     const jar = await openJar(version.id, blob);
     progress.next(undefined);
-    return { version: version.id, jar, blob };
+    return { version: version.id, jar, blob, mappings };
+}
+
+async function getMappings(manifest: VersionManifest): Promise<string | null> {
+    if (manifest.downloads.client_mappings) {
+        const url = manifest.downloads.client_mappings.url;
+        console.log(`Downloading mappings from ${url}`);
+        const response = await cachedFetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to download mappings`);
+        }
+        return await response.text();
+    }
+    return null;
+}
+
+async function remapJarIfNeeded(jar: MinecraftJar): Promise<MinecraftJar> {
+    if (jar.mappings) {
+        console.log(`Remapping jar for version ${jar.version}`);
+
+        const arrayBuffer = await jar.blob.arrayBuffer();
+        const remapped = await remapJar(arrayBuffer, jar.mappings);
+        const remappedBlob = new Blob([remapped], { type: 'application/java-archive' });
+        return { version: jar.version, jar: await openJar(jar.version, remappedBlob), blob: remappedBlob, mappings: null };
+    }
+    return jar;
 }
 
 // Hardcode as these are never going to change.

@@ -5,12 +5,17 @@ plugins {
 
 repositories {
     mavenCentral()
+    maven {
+        url = "https://maven.fabricmc.net"
+    }
+    mavenLocal()
 }
 
 dependencies {
     api libs.asm
     api libs.asm.util
     api libs.teavm.core
+    api libs.tiny.remapper
     testImplementation libs.teavm.jso
 }
 
@@ -51,11 +56,14 @@ teavm {
     js {
         moduleType = org.teavm.gradle.api.JSModuleType.ES2015
         optimization = org.teavm.gradle.api.OptimizationLevel.AGGRESSIVE
+        sourceMap = true
+        obfuscated = false
     }
     wasmGC {
         addedToWebApp = true
         modularRuntime = true
-//        obfuscated = false
+        obfuscated = false
+        sourceMap = true
         optimization = org.teavm.gradle.api.OptimizationLevel.AGGRESSIVE
     }
 }
