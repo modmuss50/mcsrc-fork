@@ -1,7 +1,6 @@
 import { BehaviorSubject, map, Observable } from "rxjs";
 import type { Token } from "../logic/Tokens";
-import { javadocApi } from "./api/JavadocApi";
-import { selectedMinecraftVersion } from "../logic/State";
+import { loadJavadocsForClass } from "./EnigmaMappings";
 
 export type JavadocString = string;
 
@@ -45,24 +44,15 @@ export function setTokenJavadoc(token: Token, javadoc: JavadocString | undefined
     console.log("Updated Javadoc data:", data);
 }
 
-// Refreshes the Javadoc data for a specific class from the server
-export async function refreshJavadocDataForClass(className: string) {
-    const minecraftVersion = selectedMinecraftVersion.value;
-    if (!minecraftVersion) {
-        throw new Error("No Minecraft version selected");
+export async function refreshJavadocDataForClass(_className: string) {
+    const data = await loadJavadocsForClass(_className);
+    const nextData = { ...javadocData.getValue() };
+
+    for (const [key, entry] of Object.entries(data.classes)) {
+        nextData.classes[key] = entry;
     }
 
-    const data = await javadocApi.getJavadoc(minecraftVersion, className);
-
-    for (const [key, entry] of Object.entries(data.data)) {
-        const classEntry = javadocData.getValue().classes[key] || { javadoc: null, methods: {}, fields: {} };
-        classEntry.javadoc = entry.value || null;
-        classEntry.methods = entry.methods || {};
-        classEntry.fields = entry.fields || {};
-        const nextData = { ...javadocData.getValue() };
-        nextData.classes[key] = classEntry;
-        javadocData.next(nextData);
-    }
+    javadocData.next(nextData);
 }
 
 export function observeJavadocForToken(token: Token): Observable<JavadocString | null> {

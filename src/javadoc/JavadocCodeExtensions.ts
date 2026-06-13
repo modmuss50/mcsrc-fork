@@ -6,6 +6,7 @@ import {
 } from "monaco-editor";
 import { getTokenLocation, type Token, type TokenLocation } from "../logic/Tokens";
 import { activeJavadocToken, getJavadocForToken, javadocData, refreshJavadocDataForClass, type JavadocData, type JavadocString } from "./Javadoc";
+import { javadocDirectory } from "./JavadocDirectory";
 import type { DecompileResult } from "../workers/decompile/types";
 
 type monaco = typeof import("monaco-editor");
@@ -14,6 +15,7 @@ const EDIT_JAVADOC_COMMAND_ID = 'editor.action.editJavadoc';
 
 export function applyJavadocCodeExtensions(monaco: monaco, editor: editor.IStandaloneCodeEditor, decompile: DecompileResult): IDisposable {
     const viewZoneIds: string[] = [];
+    const className = decompile.className.replace(".class", "");
     const javadocDataSub = javadocData.subscribe((javadoc) => {
         editor.changeViewZones((accessor) => {
             // Remove any existing zones
@@ -85,8 +87,14 @@ export function applyJavadocCodeExtensions(monaco: monaco, editor: editor.IStand
         }
     });
 
-    refreshJavadocDataForClass(decompile.className.replace(".class", "")).catch(err => {
-        console.error("Failed to refresh Javadoc data for class:", err);
+    const javadocDirectorySub = javadocDirectory.subscribe((directory) => {
+        if (!directory) {
+            return;
+        }
+
+        refreshJavadocDataForClass(className).catch(err => {
+            console.error("Failed to refresh Javadoc data for class:", err);
+        });
     });
 
     return {
@@ -95,6 +103,7 @@ export function applyJavadocCodeExtensions(monaco: monaco, editor: editor.IStand
             codeLense.dispose();
 
             javadocDataSub.unsubscribe();
+            javadocDirectorySub.unsubscribe();
             editor.changeViewZones((accessor) => {
                 viewZoneIds.forEach(id => accessor.removeZone(id));
             });

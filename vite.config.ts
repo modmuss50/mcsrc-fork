@@ -1,9 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
+import { readFileSync } from 'node:fs';
+
+// The local filesystem API requires a secure context.
+// Generate local-only certs with:
+// mkdir -p dev-certs
+// openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes -keyout dev-certs/localhost-key.pem -out dev-certs/localhost-cert.pem -subj /CN=localhost -addext subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1
+const getJavadocHttps = () => ({
+  key: readFileSync(new URL('./dev-certs/localhost-key.pem', import.meta.url)),
+  cert: readFileSync(new URL('./dev-certs/localhost-cert.pem', import.meta.url)),
+});
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     svgr(),
@@ -29,6 +39,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', 'tests/**'],
   },
   server: {
+    https: mode === 'javadoc' ? getJavadocHttps() : undefined,
     headers: {
       // E2E tests will fail on WebKit if caching enabled.
       // Only seem to be a problem in localhost.
@@ -36,14 +47,6 @@ export default defineConfig({
       'Cache-Control': 'no-store',
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-    // For javadoc API during development
-    proxy: {
-      '/v1': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-      },
     },
   },
   build: {
@@ -69,4 +72,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

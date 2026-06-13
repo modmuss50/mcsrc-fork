@@ -1,5 +1,5 @@
-import LoginModal from "../javadoc/api/LoginModal";
 import JavadocModal from "../javadoc/JavadocModal";
+import JavadocDirectoryModal from "../javadoc/JavadocDirectoryModal";
 import ProgressModal from "./ProgressModal";
 import AboutModal from "./AboutModal";
 import SettingsModal from "./SettingsModal";
@@ -13,7 +13,7 @@ const Modals = () => {
             <IndexProgressNotification />
             <ProgressModal />
             <JavadocModal />
-            <LoginModal />
+            <JavadocDirectoryModal />
             <AboutModal />
             <SettingsModal />
             <StructureModal />

@@ -4,9 +4,8 @@ import { useObservable } from "../utils/UseObservable";
 import { IS_JAVADOC_EDITOR } from "../site";
 import type { Token } from "../logic/Tokens";
 import JavadocMarkdownEditor from "./JavadocMarkdownEditor";
-import { useMemo, useState } from "react";
-import { javadocApi, type UpdateTarget } from "./api/JavadocApi";
-import { selectedMinecraftVersion } from "../logic/State";
+import { useEffect, useMemo, useState } from "react";
+import { saveTokenJavadoc } from "./EnigmaMappings";
 
 const ModalBody = ({ token, onValueChange }: { token: Token; onValueChange: (value: string | undefined) => void; }) => {
     const initialValue = useMemo(() => getJavadocForToken(token, javadocData.value) || "", [token]);
@@ -31,11 +30,19 @@ const ModalBody = ({ token, onValueChange }: { token: Token; onValueChange: (val
                 ) : null}
             </div>
             <div style={{ height: "440px", width: "100%", boxSizing: "border-box" }}>
-                <JavadocMarkdownEditor value={initialValue} onChange={onValueChange} />
+                <JavadocMarkdownEditor key={getTokenKey(token)} value={initialValue} onChange={onValueChange} />
             </div>
         </div>
     );
 };
+
+function getTokenKey(token: Token): string {
+    if (token.type === "method" || token.type === "field") {
+        return `${token.type}:${token.className}:${token.name}:${token.descriptor}`;
+    }
+
+    return `${token.type}:${token.className}`;
+}
 
 const JavadocModal = () => {
     if (!IS_JAVADOC_EDITOR) {
@@ -43,11 +50,14 @@ const JavadocModal = () => {
     }
 
     const token = useObservable(activeJavadocToken);
-    const minecraftVersion = useObservable(selectedMinecraftVersion);
     const [currentValue, setCurrentValue] = useState<string | undefined>();
     const [loading, setLoading] = useState(false);
 
     const [messageApi, contextHolder] = message.useMessage();
+
+    useEffect(() => {
+        setCurrentValue(undefined);
+    }, [token]);
 
     const handleSave = async () => {
         if (!token) {
@@ -55,33 +65,12 @@ const JavadocModal = () => {
             return;
         }
 
-        if (!minecraftVersion) {
-            messageApi.error("No Minecraft version selected.");
-            return;
-        }
-
-        var target: UpdateTarget | null = null;
-        if (token.type == 'method' || token.type == 'field') {
-            target = {
-                type: token.type,
-                name: token.name,
-                descriptor: token.descriptor
-            };
-        }
-
         setLoading(true);
         try {
-            await javadocApi.updateJavadoc(minecraftVersion, {
-                className: token.className,
-                target,
-                documentation: currentValue || ""
-            });
-
-            messageApi.success("Javadoc saved successfully.");
-
-            // Update the local in-memory Javadoc data
-            setTokenJavadoc(token, currentValue);
-
+            const documentation = currentValue ?? getJavadocForToken(token, javadocData.value) ?? "";
+            await saveTokenJavadoc(token, documentation);
+            setTokenJavadoc(token, documentation);
+            messageApi.success("Javadoc updated locally.");
             activeJavadocToken.next(null);
         } catch (error) {
             messageApi.error("Failed to save javadoc.");
