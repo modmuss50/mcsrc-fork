@@ -1,12 +1,12 @@
 import { combineLatest } from "rxjs";
 import { resetPermalinkAffectingSettings, supportsPermalinking } from "./Settings";
 import { diffLeftSelectedMinecraftVersion, diffView, selectedFile, selectedLines, selectedMinecraftVersion } from "./State";
-import { toClassFilePath, withoutClassExtension, type ClassFilePath } from "../utils/Names";
+import { isClassFilePath, toClassFilePath, toJarEntryPath, withoutClassExtension, type JarEntryPath } from "../utils/Names";
 
 export interface State {
     version: number; // Allows us to change the permalink structure in the future
     minecraftVersion: string;
-    file: ClassFilePath | undefined;
+    file: JarEntryPath | undefined;
     selectedLines: {
         line: number;
         lineEnd?: number;
@@ -71,10 +71,16 @@ export const parsePathToState = (path: string): State | null => {
     return {
         version,
         minecraftVersion,
-        file: filePath ? toClassFilePath(filePath) : undefined,
+        file: filePath ? parseJarEntryPath(filePath) : undefined,
         selectedLines: lineNumber ? { line: lineNumber, lineEnd: lineEnd || undefined } : null
     };
 };
+
+function parseJarEntryPath(filePath: string): JarEntryPath {
+    if (filePath.endsWith(".class")) return toJarEntryPath(filePath);
+    if (filePath.split('/').pop()?.includes('.')) return toJarEntryPath(filePath);
+    return toClassFilePath(filePath);
+}
 
 export const getInitialState = (): State => {
     const pathname = window.location.pathname;
@@ -147,13 +153,13 @@ if (typeof window !== "undefined") {
 
             if (diffView) {
                 url += `diff/${diffLeftMinecraftVersion}/${minecraftVersion}`;
-                if (file) {
+                if (file && isClassFilePath(file)) {
                     url += `/${withoutClassExtension(file)}`;
                 }
             } else {
-                url += `${minecraftVersion}/${withoutClassExtension(file!)}`;
+                url += `${minecraftVersion}/${isClassFilePath(file!) ? withoutClassExtension(file!) : file!}`;
 
-                if (selectedLines) {
+                if (isClassFilePath(file!) && selectedLines) {
                     const { line, lineEnd } = selectedLines;
                     if (lineEnd && lineEnd !== line) {
                         url += `#L${Math.min(line, lineEnd)}-${Math.max(line, lineEnd)}`;

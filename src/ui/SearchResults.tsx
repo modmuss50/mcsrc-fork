@@ -1,19 +1,19 @@
 import { List } from "antd";
 import { searchResults } from "../logic/JarFile";
 import { useObservable } from "../utils/UseObservable";
-import { openCodeTab } from "../logic/tabs";
-import { withoutClassExtension, type ClassFilePath } from "../utils/Names";
+import { openJarEntryTab } from "../logic/tabs";
+import { withoutClassExtension, type JarEntryPath } from "../utils/Names";
 
 const SearchResults = () => {
     const results = useObservable(searchResults);
 
     return (
-        <List<ClassFilePath>
+        <List<JarEntryPath>
             size="small"
             dataSource={results}
             renderItem={(item) => (
                 <List.Item
-                    onClick={() => openCodeTab(item)}
+                    onClick={() => openJarEntryTab(item)}
                     style={{
                         cursor: "pointer",
                         padding: "2px 8px",

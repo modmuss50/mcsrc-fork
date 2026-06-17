@@ -1,5 +1,5 @@
 import type { editor } from "monaco-editor";
-import { Tab } from "./Tabs";
+import { Tab } from "./Tab";
 import { selectedFile, tabHistory } from "../State";
 import type { ClassFilePath } from "../../utils/Names";
 

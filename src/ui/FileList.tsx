@@ -1,20 +1,21 @@
 // oxlint-disable typescript/no-base-to-string
 import { Tree, Dropdown, message } from 'antd';
 import type { TreeDataNode, TreeProps, MenuProps } from 'antd';
-import { CaretDownFilled } from '@ant-design/icons';
+import { CaretDownFilled, FileImageOutlined, FileTextOutlined } from '@ant-design/icons';
 import { combineLatest, from, map, Observable, of, shareReplay, switchMap, startWith } from 'rxjs';
-import { classesList } from '../logic/JarFile';
+import { displayFileList } from '../logic/JarFile';
 import { useObservable } from '../utils/UseObservable';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Key } from 'antd/es/table/interface';
-import { openCodeTab } from '../logic/tabs';
+import { openJarEntryTab } from '../logic/tabs';
 import { minecraftJar, type MinecraftJar } from '../logic/MinecraftApi';
 import { decompileClass } from '../logic/Decompiler';
 import { selectedFile, referencesQuery } from '../logic/State';
-import { autoJarIndex, compactPackages } from '../logic/Settings';
+import { autoJarIndex, compactPackages, showAllFiles } from '../logic/Settings';
 import { jarIndex, type ClassData } from '../workers/jar-index/client';
 import { ClassDataIcon, JavaIcon, PackageIcon } from './intellij-icons';
-import { classNameFromClassFilePath, dottedClassNameFromClassName, isClassFilePath, toClassName, withoutClassExtension, type ClassFilePath } from '../utils/Names';
+import { classNameFromClassFilePath, dottedClassNameFromClassName, isClassFilePath, toClassName, withoutClassExtension, type ClassFilePath, type JarEntryPath } from '../utils/Names';
+import { isSupportedImageFilePath } from '../logic/ImageFile';
 
 const classData: Observable<Map<string, ClassData> | null> = combineLatest([
     jarIndex,
@@ -34,22 +35,20 @@ const classData: Observable<Map<string, ClassData> | null> = combineLatest([
 );
 
 const fileTree: Observable<TreeDataNode[]> = combineLatest([
-    classesList,
+    displayFileList,
     classData,
-    compactPackages.observable
+    compactPackages.observable,
+    showAllFiles.observable
 ]).pipe(
-    map(([classNames, classData, compact]) => {
+    map(([fileNames, classData, compact, showAll]) => {
         const dirs = new Map<string, TreeDataNode[]>();
         dirs.set('', []);
 
-        for (const classPath of classNames) {
-            if (classPath.includes('$')) continue;
+        for (const filePath of fileNames) {
+            const i = filePath.lastIndexOf('/');
+            const dirPath = i === -1 ? '' : filePath.slice(0, i);
 
-            const className = classNameFromClassFilePath(classPath);
-            const i = className.lastIndexOf('/');
-            const dirPath = className.slice(0, i);
-
-            if (!dirs.has(dirPath)) {
+            if (dirPath && !dirs.has(dirPath)) {
                 const parts = dirPath.split('/');
                 parts.forEach((p, i) => {
                     const parent = parts.slice(0, i).join('/');
@@ -68,21 +67,26 @@ const fileTree: Observable<TreeDataNode[]> = combineLatest([
                 });
             };
 
-            const data = classData?.get(className);
+            const className = isClassFilePath(filePath) ? classNameFromClassFilePath(filePath) : null;
+            const data = className ? classData?.get(className) : null;
             dirs.get(dirPath)!.push({
-                title: className.slice(i + 1),
-                key: classPath,
+                title: filePath.slice(i + 1),
+                key: filePath,
                 isLeaf: true,
-                icon: data
-                    ? <ClassDataIcon data={data} style={{ fontSize: '16px' }} />
-                    : <JavaIcon style={{ fontSize: '16px' }} />,
+                icon: className
+                    ? data
+                        ? <ClassDataIcon data={data} style={{ fontSize: '16px' }} />
+                        : <JavaIcon style={{ fontSize: '16px' }} />
+                    : isSupportedImageFilePath(filePath)
+                        ? <FileImageOutlined style={{ fontSize: '16px' }} />
+                        : <FileTextOutlined style={{ fontSize: '16px' }} />,
             });
         }
 
         function traverse(dir: string, parent: TreeDataNode) {
             const nodes = dirs.get(dir)!;
 
-            if (compact && nodes.length === 1 && !nodes[0].isLeaf) {
+            if (!showAll && compact && nodes.length === 1 && !nodes[0].isLeaf) {
                 const node = nodes[0];
                 parent.title = `${parent.title?.toString()}/${node.title?.toString()}`;
                 traverse(node.key as string, parent);
@@ -151,8 +155,8 @@ const getMenuItems = (
     if (!contextMenu) return [];
 
     const path = contextMenu.key;
-    const isFile = isClassFilePath(path);
-    const packagePath = isFile ? dottedClassNameFromClassName(classNameFromClassFilePath(path)) : withoutClassExtension(path);
+    const isClass = isClassFilePath(path);
+    const packagePath = isClass ? dottedClassNameFromClassName(classNameFromClassFilePath(path)) : path;
     const filename = path.split('/').pop() || '';
     const linkPath = withoutClassExtension(path);
     const link = jar ? `https://mcsrc.dev/1/${jar.version}/${linkPath}` : '';
@@ -209,15 +213,15 @@ const getMenuItems = (
                     message.success('Link copied');
                 }
             },
-            disabled: !link || !isFile
+            disabled: !link || !isClass
         },
         {
             key: 'copy-content',
             label: 'Copy File Content',
             onClick: () => {
-                if (isFile) handleCopyItem(path);
+                if (isClass) handleCopyItem(path);
             },
-            disabled: !isFile
+            disabled: !isClass
         },
         {
             key: 'find-all-references',
@@ -225,7 +229,7 @@ const getMenuItems = (
             onClick: () => {
                 referencesQuery.next(toClassName(path));
             },
-            disabled: !isFile
+            disabled: !isClass
         },
     ];
 };
@@ -236,13 +240,13 @@ const FileList = () => {
 
     const jar = useObservable(minecraftJar);
     const selectedKeys = useObservable(selectedFileKeys);
-    const classes = useObservable(classesList);
+    const files = useObservable(displayFileList);
     const onSelect: TreeProps['onSelect'] = useCallback((selectedKeys: Key[]) => {
         if (selectedKeys.length === 0) return;
         const key = selectedKeys[0];
-        if (typeof key !== "string" || !isClassFilePath(key) || !classes.includes(key)) return;
-        openCodeTab(key);
-    }, [classes]);
+        if (typeof key !== "string" || !files.includes(key as JarEntryPath)) return;
+        openJarEntryTab(key as JarEntryPath);
+    }, [files]);
 
     const treeData = useObservable(fileTree);
 

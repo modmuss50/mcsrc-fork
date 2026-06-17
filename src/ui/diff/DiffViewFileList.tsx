@@ -13,7 +13,7 @@ import { selectedFile } from "../../logic/State";
 import { openCodeTab } from "../../logic/tabs";
 import { useObservable } from "../../utils/UseObservable";
 import { pendingDiffJump } from "./DiffNavigation";
-import { withoutClassExtension, type ClassFilePath } from "../../utils/Names";
+import { isClassFilePath, withoutClassExtension, type ClassFilePath } from "../../utils/Names";
 
 const statusColors: Record<ChangeState, string> = {
     modified: "gold",
@@ -98,7 +98,7 @@ const DiffChangedFiles = () => {
                 <DiffFileRow
                     key={entry.key}
                     entry={entry}
-                    selected={currentFile === entry.file}
+                    selected={isClassFilePath(currentFile || "") && currentFile === entry.file}
                     disabled={!!loading}
                 />
             ))}

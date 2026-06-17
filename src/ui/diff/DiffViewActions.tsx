@@ -14,6 +14,7 @@ import { bytecode, unifiedDiff } from "../../logic/Settings";
 import { selectedFile } from "../../logic/State";
 import { openCodeTab } from "../../logic/tabs";
 import { useObservable } from "../../utils/UseObservable";
+import { isClassFilePath } from "../../utils/Names";
 import {
     jumpWithinCurrentFile,
     pendingDiffJump,
@@ -33,7 +34,7 @@ export const DiffNavigationButtons = () => {
 
         if (changedFiles.length === 0) return;
 
-        const currentIndex = currentFile ? changedFiles.indexOf(currentFile) : -1;
+        const currentIndex = currentFile && isClassFilePath(currentFile) ? changedFiles.indexOf(currentFile) : -1;
         const targetIndex = currentIndex === -1
             ? direction === 1 ? 0 : changedFiles.length - 1
             : currentIndex + direction;
@@ -72,7 +73,7 @@ export const DiffViewModeButtons = () => {
     const isBytecode = useObservable(bytecode.observable);
     const currentFile = useObservable(selectedFile);
     const changes = useObservable(diffChanges);
-    const currentChange = currentFile ? changes?.get(currentFile) : undefined;
+    const currentChange = currentFile && isClassFilePath(currentFile) ? changes?.get(currentFile) : undefined;
     const hasNoLineChanges = currentChange?.state === "modified"
         && currentChange.additions === 0
         && currentChange.deletions === 0;

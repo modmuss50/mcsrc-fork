@@ -12,8 +12,12 @@ import { MenuFoldOutlined } from '@ant-design/icons';
 import { TabsComponent } from './TabsComponent.tsx';
 import Modals from './Modals.tsx';
 import { EmptyState } from './EmptyState.tsx';
-import { CodeTab, InheritanceViewTab } from '../logic/tabs';
+import { CodeTab, InheritanceViewTab, openJarEntryTab } from '../logic/tabs';
 import { InheritanceView } from './inheritance/InheritanceView.tsx';
+import { TextFile } from './TextFile.tsx';
+import { UnsupportedFile } from './UnsupportedFile.tsx';
+import { PngFile } from './PngFile.tsx';
+import { PngFileTab, TextFileTab, UnsupportedFileTab } from '../logic/tabs';
 
 const App = () => {
     const darkMode = useObservable(isDarkMode);
@@ -47,10 +51,19 @@ const App = () => {
 const MainView = () => {
     const tabs = useObservable(openTabs);
     const currentTab = useObservable(openTab);
+    const currentFile = useObservable(selectedFile);
+
+    useEffect(() => {
+        if (!currentFile || (tabs && tabs.length > 0)) return;
+        openJarEntryTab(currentFile);
+    }, [currentFile, tabs]);
 
     if (!tabs || tabs.length == 0) return <EmptyState />;
 
     if (currentTab instanceof CodeTab) return <Code />;
+    else if (currentTab instanceof PngFileTab) return <PngFile tab={currentTab} />;
+    else if (currentTab instanceof TextFileTab) return <TextFile tab={currentTab} />;
+    else if (currentTab instanceof UnsupportedFileTab) return <UnsupportedFile />;
     else if (currentTab instanceof InheritanceViewTab) return <InheritanceView tab={currentTab} />;
     else return <EmptyState />;
 };

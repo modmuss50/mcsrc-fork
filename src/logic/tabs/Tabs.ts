@@ -1,91 +1,13 @@
-import { openTabs, tabHistory, openTab } from "../State";
-import { enableTabs } from "../Settings";
-import { CodeTab, InheritanceViewTab } from "./index";
-import type { ClassFilePath } from "../../utils/Names";
-
-export abstract class Tab {
-    public key: string;
-
-    public constructor(key: string) {
-        this.key = key;
-    }
-
-    public open() {
-        if (openTab.value && openTab.value.key === this.key) return;
-        const activeTab = getOpenTab();
-        activeTab?.onBlur();
-
-        if (enableTabs.value) {
-            // Get tabs and find index of currently open one
-            const tabs = [...openTabs.value];
-            let openTabIndex = -1;
-            if (openTab.value != null) {
-                // openTabIndex = tabs.indexOf(openTab.value);
-                openTabIndex = tabs.findIndex(t => t.key === openTab.value?.key);
-            }
-
-            // If class is not already in open tabs array, add it
-            if (!tabs.some(tab => tab.key === this.key)) {
-                const insertIndex = openTabIndex >= 0 ? openTabIndex + 1 : tabs.length;
-                tabs.splice(insertIndex, 0, this);
-                openTabs.next(tabs);
-            }
-        } else {
-            openTabs.next([this]);
-        }
-
-        this.pushToTabHistory();
-        openTab.next(this);
-    }
-
-    public onClose() {
-        openTabs.next(openTabs.value.filter(t => t.key !== this.key));
-
-        if (openTabs.value.length === 0) {
-            openTab.next(null);
-        }
-
-        this.removeFromTabHistory();
-    };
-
-    protected onBlur() { };
-
-    protected pushToTabHistory() {
-        if (tabHistory.value.length < 50) {
-            // Limit history to 50
-            tabHistory.next([...tabHistory.value, this.key]);
-        }
-    }
-
-    protected removeFromTabHistory() {
-        tabHistory.next(tabHistory.value.filter(v => v != this.key));
-    }
-
-    public openLastTabFromHistory() {
-        const lastTabKeyFromHistory = tabHistory.value.length > 0 ?
-            tabHistory.value[tabHistory.value.length - 1] : null;
-
-        // Get the last tab
-        let tab = openTabs.value.find(t => t.key === lastTabKeyFromHistory);
-
-        // If no tab can be found in the tab history, we simply default to the first open one
-        if (!tab) tab = openTabs.value[0];
-        tab?.open();
-    }
-
-    public closeOtherTabs() {
-        // Invalidate all tabs except the one being kept
-        openTabs.value.forEach(t => {
-            if (t.key !== this.key) t.onClose();
-        });
-
-        openTabs.value.find(t => t.key === this.key)?.open();
-    }
-}
-
-export const getOpenTab = <T extends Tab>(): T | null => {
-    return openTab.value as T | null;
-};
+import { openTabs, openTab } from "../State";
+import { isSupportedImageFilePath } from "../ImageFile";
+import { isSupportedTextFilePath } from "../TextFile";
+import { isClassFilePath, type ClassFilePath, type JarEntryPath } from "../../utils/Names";
+import { Tab } from "./Tab";
+import { CodeTab } from "./CodeTab";
+import { InheritanceViewTab } from "./InheritanceViewTab";
+import { PngFileTab } from "./PngFileTab";
+import { TextFileTab } from "./TextFileTab";
+import { UnsupportedFileTab } from "./UnsupportedFileTab";
 
 const openTabOfType = <K extends string, T extends Tab>(
     key: K,
@@ -112,6 +34,20 @@ export const openUnknownTypeTab = (key: string) => {
 };
 
 export const openCodeTab = (key: ClassFilePath) => openTabOfType(key, CodeTab);
+export const openPngFileTab = (key: JarEntryPath) => openTabOfType(key, PngFileTab);
+export const openTextFileTab = (key: JarEntryPath) => openTabOfType(key, TextFileTab);
+export const openUnsupportedFileTab = (key: JarEntryPath) => openTabOfType(key, UnsupportedFileTab);
+export const openJarEntryTab = (key: JarEntryPath) => {
+    if (isClassFilePath(key)) {
+        openCodeTab(key);
+    } else if (isSupportedImageFilePath(key)) {
+        openPngFileTab(key);
+    } else if (isSupportedTextFilePath(key)) {
+        openTextFileTab(key);
+    } else {
+        openUnsupportedFileTab(key);
+    }
+};
 export const openInheritanceViewTab = (key: string) => openTabOfType(key, InheritanceViewTab);
 
 export const closeTab = (key: string) => {

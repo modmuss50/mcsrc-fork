@@ -16,7 +16,7 @@ import {
     registerDiffNavigator,
     type DiffDirection
 } from './DiffNavigation';
-import { classNameFromClassFilePath } from '../../utils/Names';
+import { classNameFromClassFilePath, isClassFilePath } from '../../utils/Names';
 
 const IS_ANDROID_CHROME = /Android/.test(navigator.userAgent) && /Chrome/.test(navigator.userAgent);
 
@@ -38,7 +38,7 @@ const DiffCode = () => {
 
     useEffect(() => {
         if (loading) return;
-        if (!currentPath) return;
+        if (!currentPath || !isClassFilePath(currentPath)) return;
         if (!leftResult) return;
         if (!rightResult) return;
 

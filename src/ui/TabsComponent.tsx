@@ -3,8 +3,10 @@ import { useObservable } from "../utils/UseObservable";
 import { closeTab, setTabPosition, closeOtherTabs, openUnknownTypeTab, InheritanceViewTab } from "../logic/tabs";
 import React, { useEffect, useRef, useState } from "react";
 import { openTabs, openTab } from "../logic/State";
+import { FileImageOutlined, FileTextOutlined, FileUnknownOutlined } from "@ant-design/icons";
 import { HierarchyIcon } from "./intellij-icons";
-import { withoutClassExtension } from "../utils/Names";
+import { isClassFilePath, withoutClassExtension } from "../utils/Names";
+import { PngFileTab, TextFileTab, UnsupportedFileTab } from "../logic/tabs";
 
 export const TabsComponent = () => {
     // variables - tabs
@@ -28,7 +30,7 @@ export const TabsComponent = () => {
     // variables - tab ghost image
     const ghostImage = useRef<HTMLElement | null>(null);
 
-    const getTabLabel = (key: string) => withoutClassExtension(key).split("/").pop();
+    const getTabLabel = (key: string) => (isClassFilePath(key) ? withoutClassExtension(key) : key).split("/").pop();
 
     // helpers
     const getRects = () => {
@@ -228,7 +230,10 @@ export const TabsComponent = () => {
                             </div>
                         ),
                         icon: (
-                            tab instanceof InheritanceViewTab ? <HierarchyIcon /> : null
+                            tab instanceof InheritanceViewTab ? <HierarchyIcon /> :
+                                tab instanceof PngFileTab ? <FileImageOutlined /> :
+                                tab instanceof TextFileTab ? <FileTextOutlined /> :
+                                    tab instanceof UnsupportedFileTab ? <FileUnknownOutlined /> : null
                         )
                     }))}
                     renderTabBar={(tabBarProps, DefaultTabBar) => (

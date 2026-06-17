@@ -10,7 +10,7 @@ import type { Options } from "./vf";
 import type { DecompileResult } from "../workers/decompile/types";
 import * as worker from "../workers/decompile/client";
 import type { Jar } from "../utils/Jar";
-import { classNameFromClassFilePath, type ClassName } from "../utils/Names";
+import { classNameFromClassFilePath, isClassFilePath, type ClassName } from "../utils/Names";
 
 const decompilerCounter = new BehaviorSubject<number>(0);
 
@@ -46,7 +46,7 @@ export function decompileResultPipeline(jar: Observable<MinecraftJar>): Observab
         distinctUntilChanged(),
         throttleTime(250),
         switchMap(([file, jar, bytecode]) => {
-            if (!file) {
+            if (!file || !isClassFilePath(file)) {
                 return of();
             }
 

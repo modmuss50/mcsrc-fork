@@ -11,6 +11,7 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { focusSearchEvent } from "../logic/Keybinds";
 import { useEffect, useRef } from "react";
 import { searchQuery, referencesQuery } from "../logic/State";
+import { showAllFiles } from "../logic/Settings";
 
 const { Search } = Input;
 
@@ -18,6 +19,7 @@ const SideBar = () => {
     const showReference = useObservable(isViewingReferences);
     const currentReferenceQuery = useObservable(referencesQuery);
     const focusSearch = useObservable(focusSearchEvent);
+    const allFiles = useObservable(showAllFiles.observable);
     const searchRef = useRef<InputRef>(null);
 
     useEffect(() => {
@@ -54,7 +56,7 @@ const SideBar = () => {
                     </div>
                 </>
             ) : (
-                <Search ref={searchRef} placeholder="Search classes" allowClear onChange={onChange}></Search>
+                <Search ref={searchRef} placeholder={allFiles ? "Search files" : "Search classes"} allowClear onChange={onChange}></Search>
             )}
             <Divider size="small" />
             <div style={{ flexGrow: 1, overflowY: "auto" }}>

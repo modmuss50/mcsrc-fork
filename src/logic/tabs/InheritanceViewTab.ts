@@ -1,5 +1,5 @@
 import type { TreeDataNode } from "antd";
-import { Tab } from "./Tabs";
+import { Tab } from "./Tab";
 import type { Key } from "react";
 import { selectedFile, tabHistory } from "../State";
 import { toClassName, type ClassName } from "../../utils/Names";

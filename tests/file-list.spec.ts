@@ -49,4 +49,41 @@ test.describe('File List Navigation', () => {
         const netFolder = fileTree.getByText('net').first();
         await expect(netFolder).toBeVisible();
     });
+
+    test('Shows classes only by default', async ({ page }) => {
+        await page.goto('/');
+
+        await expect(page.getByRole('searchbox', { name: 'Search classes' })).toBeVisible();
+        await expect(page.getByText('sample.json', { exact: true })).toHaveCount(0);
+    });
+
+    test('Shows and opens text files when all files are enabled', async ({ page }) => {
+        await page.addInitScript(() => {
+            localStorage.setItem('setting_show_all_files', 'true');
+        });
+
+        await page.goto('/');
+        await page.getByText('assets', { exact: true }).click();
+        await page.getByText('mcsrc', { exact: true }).click();
+
+        const sampleJson = page.getByText('sample.json', { exact: true });
+        await expect(sampleJson).toBeVisible();
+        await sampleJson.click();
+
+        const editor = page.getByRole("code").nth(0);
+        await expect(editor).toContainText('"name": "dummy-three"');
+        await expect(editor).toContainText('"enabled": true');
+    });
+
+    test('Shows unsupported files when all files are enabled', async ({ page }) => {
+        await page.addInitScript(() => {
+            localStorage.setItem('setting_show_all_files', 'true');
+        });
+
+        await page.goto('/');
+        await page.getByText('META-INF', { exact: true }).click();
+        await page.getByText('MANIFEST.MF', { exact: true }).click();
+
+        await expect(page.getByText('Unsupported file', { exact: true })).toBeVisible();
+    });
 });
