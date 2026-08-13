@@ -1,5 +1,5 @@
 import { read, type Entry, type Reader, type Zip, readBlob } from "@katana-project/zip";
-import type { JarEntryPath } from "./Names";
+import { isClassFilePath, type ClassFilePath, type JarEntryPath } from "./Names";
 
 export interface Jar {
     name: string;
@@ -12,6 +12,46 @@ export async function openJar(name: string, blob: Blob): Promise<Jar> {
         naive: true
     });
     return new JarImpl(name, blob, zip);
+}
+
+export interface BrowsableJar {
+    classes: Map<ClassFilePath, { jar: Jar; path: ClassFilePath }>;
+    nestedJars: string[];
+}
+
+const browsableJars = new WeakMap<Jar, Promise<BrowsableJar>>();
+
+export function browseJar(jar: Jar): Promise<BrowsableJar> {
+    let result = browsableJars.get(jar);
+    if (result) return result;
+
+    result = collectJar(jar, "", { classes: new Map(), nestedJars: [] });
+    browsableJars.set(jar, result);
+    return result;
+}
+
+async function collectJar(jar: Jar, prefix: string, result: BrowsableJar): Promise<BrowsableJar> {
+    for (const [path, entry] of Object.entries(jar.entries)) {
+        if (!entry) continue;
+        const virtualPath = `${prefix}${path}`;
+
+        if (isClassFilePath(path)) {
+            result.classes.set(virtualPath as ClassFilePath, { jar, path });
+            continue;
+        }
+
+        if (!path.toLowerCase().endsWith(".jar")) continue;
+        result.nestedJars.push(virtualPath);
+        try {
+            const bytes = await entry.bytes();
+            const blob = new Blob([bytes.slice().buffer], { type: "application/java-archive" });
+            const nested = await openJar(`${jar.name}!/${path}`, blob);
+            await collectJar(nested, `${virtualPath}/`, result);
+        } catch (error) {
+            console.warn(`Unable to open nested JAR ${virtualPath}`, error);
+        }
+    }
+    return result;
 }
 
 // TODO: fix

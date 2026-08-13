@@ -9,10 +9,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Key } from 'antd/es/table/interface';
 import { openCodeTab } from '../logic/tabs';
 import { modJar, type ModJar } from '../logic/ModrinthApi';
-import { decompileClass, getDecompilerOptions } from '../logic/Decompiler';
+import { decompileVirtualClass } from '../logic/Decompiler';
 import { selectedFile, referencesQuery } from '../logic/State';
 import { autoJarIndex, compactPackages, displayLambdas } from '../logic/Settings';
-import { setOptions } from '../workers/decompile/client';
 import { jarIndex, type ClassData } from '../workers/jar-index/client';
 import { ClassDataIcon, JavaIcon, PackageIcon } from './intellij-icons';
 import { classNameFromClassFilePath, dottedClassNameFromClassName, isClassFilePath, toClassName, withoutClassExtension, type ClassFilePath } from '../utils/Names';
@@ -65,6 +64,16 @@ const fileTree: Observable<TreeDataNode[]> = combineLatest([
             };
         };
 
+        for (const jarPath of nestedJars) {
+            ensureDirectory(jarPath);
+            const i = jarPath.lastIndexOf('/');
+            const parentPath = jarPath.slice(0, i);
+            const node = dirs.get(parentPath)!.find(node => node.key === jarPath);
+            if (node) {
+                node.icon = <FileZipOutlined style={{ fontSize: '16px' }} />;
+            }
+        }
+
         for (const classPath of classNames) {
             const className = classNameFromClassFilePath(classPath);
             const i = className.lastIndexOf('/');
@@ -79,18 +88,6 @@ const fileTree: Observable<TreeDataNode[]> = combineLatest([
                 icon: data
                     ? <ClassDataIcon data={data} style={{ fontSize: '16px' }} />
                     : <JavaIcon style={{ fontSize: '16px' }} />,
-            });
-        }
-
-        for (const jarPath of nestedJars) {
-            const i = jarPath.lastIndexOf('/');
-            const dirPath = jarPath.slice(0, i);
-            ensureDirectory(dirPath);
-            dirs.get(dirPath)!.push({
-                title: jarPath.slice(i + 1),
-                key: jarPath,
-                isLeaf: true,
-                icon: <FileZipOutlined style={{ fontSize: '16px' }} />,
             });
         }
 
@@ -142,8 +139,7 @@ function getPathKeys(filePath: string): Key[] {
 const handleCopyContent = async (path: ClassFilePath, jar: ModJar) => {
     try {
         message.loading({ content: 'Decompiling...', key: 'copy-content' });
-        await setOptions(getDecompilerOptions(displayLambdas.value));
-        const result = await decompileClass(classNameFromClassFilePath(path), jar.jar);
+        const result = await decompileVirtualClass(path, jar.jar, false, displayLambdas.value);
         await navigator.clipboard.writeText(result.source);
         message.success({ content: 'Content copied to clipboard', key: 'copy-content' });
     } catch (e) {
@@ -170,7 +166,7 @@ const getMenuItems = (
     const isFile = isClassFilePath(path);
     const packagePath = isFile ? dottedClassNameFromClassName(classNameFromClassFilePath(path)) : withoutClassExtension(path);
     const filename = path.split('/').pop() || '';
-    const linkPath = withoutClassExtension(path);
+    const linkPath = withoutClassExtension(path).split('/').map(encodeURIComponent).join('/');
     const link = jar ? `https://modsrc.dev/1/${jar.project.project_id}/${jar.file.id}/${linkPath}` : '';
 
     const renderLabel = (title: string, value: string) => (
@@ -253,18 +249,13 @@ const FileList = () => {
     const jar = useObservable(modJar);
     const selectedKeys = useObservable(selectedFileKeys);
     const classes = useObservable(classesList);
-    const nestedJars = useObservable(nestedJarList);
     const onSelect: TreeProps['onSelect'] = useCallback((selectedKeys: Key[]) => {
         if (selectedKeys.length === 0) return;
         const key = selectedKeys[0];
         if (typeof key !== "string") return;
-        if (nestedJars?.includes(key)) {
-            message.info('Embedded JARs are not supported yet.');
-            return;
-        }
         if (!isClassFilePath(key) || !classes.includes(key)) return;
         openCodeTab(key);
-    }, [classes, nestedJars]);
+    }, [classes]);
 
     const treeData = useObservable(fileTree);
 

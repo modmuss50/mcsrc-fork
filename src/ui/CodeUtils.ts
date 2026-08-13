@@ -1,6 +1,8 @@
 import { editor } from "monaco-editor";
 import { type Token } from '../logic/Tokens';
 import { toClassFilePath, type ClassFilePath } from "../utils/Names";
+import { contextualClassFilePath } from "../utils/Names";
+import { selectedFile } from "../logic/State";
 
 export function findTokenAtPosition(
     editor: editor.ICodeEditor,
@@ -30,7 +32,7 @@ export function findTokenAtPosition(
 
     for (const token of decompileResult.tokens) {
         if (targetOffset >= token.start && targetOffset <= token.start + token.length) {
-            const className = toClassFilePath(token.className.split('$')[0]);
+            const className = contextualClassFilePath(selectedFile.value, toClassFilePath(token.className.split('$')[0]));
             if (!useClassList || classList!.includes(className)) {
                 return token;
             }

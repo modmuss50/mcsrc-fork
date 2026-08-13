@@ -71,3 +71,16 @@ export function outerClassName(className: ClassName): ClassName {
 export function outerClassFilePath(path: ClassFilePath): ClassFilePath {
     return toClassFilePath(outerClassName(classNameFromClassFilePath(path)));
 }
+
+// Nested JARs are exposed as virtual directories: libraries/example.jar/com/example/Main.class.
+export function internalClassFilePath(path: ClassFilePath): ClassFilePath {
+    const lowerPath = path.toLowerCase();
+    const nestedJarEnd = lowerPath.lastIndexOf(".jar/");
+    return (nestedJarEnd === -1 ? path : path.slice(nestedJarEnd + ".jar/".length)) as ClassFilePath;
+}
+
+export function contextualClassFilePath(current: ClassFilePath | undefined, target: ClassFilePath): ClassFilePath {
+    if (!current) return target;
+    const internal = internalClassFilePath(current);
+    return `${current.slice(0, current.length - internal.length)}${target}` as ClassFilePath;
+}

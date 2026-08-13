@@ -4,7 +4,8 @@ import { currentResult, decompileResultPipeline } from "./Decompiler";
 import { calculatedLineChanges } from "./LineChanges";
 import { diffComparisonFileId, selectedModFileId, selectedModProjectId } from "./State";
 import type { DecompileResult } from "../workers/decompile/types";
-import { classNameFromClassFilePath, isClassFilePath, toClassFilePath, withoutClassExtension, type ClassFilePath, type ClassName } from "../utils/Names";
+import { classNameFromClassFilePath, internalClassFilePath, isClassFilePath, toClassFilePath, withoutClassExtension, type ClassFilePath, type ClassName } from "../utils/Names";
+import { browseJar } from "../utils/Jar";
 
 export interface EntryInfo {
     classCrcs: Map<ClassName, number>;
@@ -137,11 +138,12 @@ export type ChangeState = "added" | "deleted" | "modified";
 async function getEntriesWithCRC(jar: ModJar): Promise<Map<ClassFilePath, EntryInfo>> {
     const entries = new Map<ClassFilePath, EntryInfo>();
 
-    for (const [path, file] of Object.entries(jar.jar.entries)) {
-        if (!isClassFilePath(path) || !file) {
-            continue;
-        }
+    const contents = await browseJar(jar.jar);
+    for (const [virtualPath, resolved] of contents.classes) {
+        const file = resolved.jar.entries[resolved.path];
+        if (!file) continue;
 
+        const path = internalClassFilePath(virtualPath);
         const className = classNameFromClassFilePath(path);
         const lastSlash = path.lastIndexOf('/');
         const folder = lastSlash !== -1 ? path.substring(0, lastSlash + 1) : '';

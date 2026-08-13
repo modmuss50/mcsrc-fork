@@ -30,6 +30,7 @@ const ComparisonSelectionModal = () => {
                     project={current.project}
                     excludeFileId={excludedFile}
                     matchVersion={reference?.version}
+                    allowPlatformFilter
                     onSelect={version => {
                         selectedFile.next(undefined);
                         if (side === "right") {

@@ -9,7 +9,8 @@ import type { Options } from "./vf";
 import type { DecompileResult } from "../workers/decompile/types";
 import * as worker from "../workers/decompile/client";
 import type { Jar } from "../utils/Jar";
-import { classNameFromClassFilePath, type ClassName } from "../utils/Names";
+import { classNameFromClassFilePath, internalClassFilePath, type ClassFilePath, type ClassName } from "../utils/Names";
+import { browseJar } from "../utils/Jar";
 
 const decompilerCounter = new BehaviorSubject<number>(0);
 
@@ -43,18 +44,22 @@ export function decompileResultPipeline(jar: Observable<{ jar: Jar }>): Observab
                 return of();
             }
 
-            const className = classNameFromClassFilePath(file);
-            if (bytecode) {
-                return from(getClassBytecode(className, jar.jar));
-            }
-
-            const options = getDecompilerOptions(displayLambdas);
-            return from(worker.setOptions(options)).pipe(
-                switchMap(() => from(decompileClass(className, jar.jar)))
-            );
+            return from(decompileVirtualClass(file, jar.jar, bytecode, displayLambdas));
         }),
         shareReplay({ bufferSize: 1, refCount: false })
     );
+}
+
+export async function decompileVirtualClass(file: ClassFilePath, rootJar: Jar, showBytecode = false, lambdas = displayLambdas.value) {
+    const classes = (await browseJar(rootJar)).classes;
+    const entry = classes.get(file) ?? [...classes.entries()].find(([path]) => internalClassFilePath(path) === file)?.[1];
+    if (!entry) return decompileClass(classNameFromClassFilePath(file), rootJar);
+
+    const className = classNameFromClassFilePath(entry.path);
+    if (showBytecode) return getClassBytecode(className, entry.jar);
+
+    await worker.setOptions(getDecompilerOptions(lambdas));
+    return decompileClass(className, entry.jar);
 }
 
 export async function getClassBytecode(className: ClassName, jar: Jar) {

@@ -52,7 +52,7 @@ export const parsePathToState = (path: string): State | null => {
         && /^[A-Za-z0-9]{8}$/.test(firstFileId)
         && /^[A-Za-z0-9]{8}$/.test(decodeURIComponent(segments[3]));
     const fileId = hasDiffFileIds ? decodeURIComponent(segments[3]) : firstFileId;
-    const filePath = segments.slice(hasDiffFileIds ? 4 : 3).join('/');
+    const filePath = segments.slice(hasDiffFileIds ? 4 : 3).map(decodeURIComponent).join('/');
     if (!projectId || !fileId) return null;
 
     return {
@@ -124,7 +124,7 @@ if (typeof window !== "undefined") {
                 }
 
                 let url = `/1/${encodeURIComponent(projectId)}/${encodeURIComponent(comparisonFileId)}/${encodeURIComponent(fileId)}`;
-                if (file) url += `/${withoutClassExtension(file)}`;
+                if (file) url += `/${encodeFilePath(withoutClassExtension(file))}`;
                 window.history.replaceState({}, '', url);
                 return;
             }
@@ -151,7 +151,7 @@ if (typeof window !== "undefined") {
 
             let url = `/1/${encodeURIComponent(projectId)}/${encodeURIComponent(fileId)}`;
             if (file) {
-                url += `/${withoutClassExtension(file)}`;
+                url += `/${encodeFilePath(withoutClassExtension(file))}`;
                 if (selectedLines) {
                     const { line, lineEnd } = selectedLines;
                     url += lineEnd && lineEnd !== line
@@ -163,4 +163,8 @@ if (typeof window !== "undefined") {
             window.history.replaceState({}, '', url);
         });
     });
+}
+
+function encodeFilePath(path: string): string {
+    return path.split('/').map(encodeURIComponent).join('/');
 }

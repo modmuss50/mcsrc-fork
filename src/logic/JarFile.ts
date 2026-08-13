@@ -1,21 +1,24 @@
-import { BehaviorSubject, asyncScheduler, combineLatest, distinct, distinctUntilChanged, map, Observable, switchMap, throttleTime } from 'rxjs';
+import { asyncScheduler, combineLatest, distinctUntilChanged, from, map, Observable, shareReplay, switchMap, throttleTime } from 'rxjs';
 import { modJar } from './ModrinthApi';
 import { performSearch } from './Search';
 import { searchQuery } from './State';
 import { isClassFilePath, type ClassFilePath } from '../utils/Names';
+import { browseJar } from '../utils/Jar';
 
-export const fileList = modJar.pipe(
-    distinctUntilChanged(),
-    map(jar => Object.keys(jar.jar.entries))
+export const browsableJar = modJar.pipe(
+    switchMap(jar => from(browseJar(jar.jar))),
+    shareReplay(1)
 );
 
 // File list that only contains outer class files
-export const classesList = fileList.pipe(
-    map(files => files.filter((file): file is ClassFilePath => isClassFilePath(file) && !file.includes('$')))
+export const classesList = browsableJar.pipe(
+    map(contents => [...contents.classes.entries()]
+        .filter(([, entry]) => !entry.path.includes('$'))
+        .map(([path]) => path))
 );
 
-export const nestedJarList = fileList.pipe(
-    map(files => files.filter(file => file.toLowerCase().endsWith('.jar')))
+export const nestedJarList = browsableJar.pipe(
+    map(contents => contents.nestedJars)
 );
 
 const debouncedSearchQuery: Observable<string> = searchQuery.pipe(

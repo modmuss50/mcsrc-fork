@@ -5,7 +5,7 @@ import { getTokenLocation } from '../logic/Tokens';
 import { selectedFile } from "../logic/State";
 import type { DecompileResult } from "../workers/decompile/types";
 import { BehaviorSubject } from "rxjs";
-import { classNameFromClassFilePath, outerClassFilePath, toClassFilePath, type ClassFilePath } from "../utils/Names";
+import { classNameFromClassFilePath, contextualClassFilePath, internalClassFilePath, outerClassFilePath, toClassFilePath, type ClassFilePath } from "../utils/Names";
 import { findDeclaration } from "../logic/FindDeclaration.ts";
 
 export type TokenJumpTarget = {
@@ -87,7 +87,7 @@ export function createDefinitionProvider(
                 if (targetOffset >= token.start && targetOffset <= token.start + token.length) {
                     const targetClass = await findDeclaration(token);
 
-                    const className = toClassFilePath(targetClass);
+                    const className = contextualClassFilePath(selectedFile.value, toClassFilePath(targetClass));
                     const baseClassName = outerClassFilePath(className);
                     console.log(`Found token for definition: ${className} at offset ${token.start}`);
 
@@ -155,7 +155,7 @@ export function createEditorOpener(
                 }
             } else if (baseClassName != className) {
                 // Handle inner class navigation
-                const innerClassName = classNameFromClassFilePath(className);
+                const innerClassName = classNameFromClassFilePath(internalClassFilePath(className));
                 // Always use the queue, even for same-file jumps
                 requestTokenJump(baseClassName, 'class', innerClassName);
                 if (!jumpInSameFile) {

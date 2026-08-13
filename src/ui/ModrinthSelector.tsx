@@ -2,6 +2,7 @@ import {
     Alert,
     Avatar,
     Button,
+    Checkbox,
     Empty,
     Flex,
     Input,
@@ -145,16 +146,21 @@ function matchesPlatform(version: ModrinthVersion, reference?: ModrinthVersion):
         && version.game_versions.some(gameVersion => reference.game_versions.includes(gameVersion));
 }
 
-export function VersionResults({ project, onBack, onSelect, excludeFileId, matchVersion }: {
+export function VersionResults({ project, onBack, onSelect, excludeFileId, matchVersion, allowPlatformFilter = false }: {
     project: ModrinthProject;
     onBack?: () => void;
     onSelect: (version: SelectableModrinthVersion) => void;
     excludeFileId?: string;
     matchVersion?: ModrinthVersion;
+    allowPlatformFilter?: boolean;
 }) {
     const [versions, setVersions] = useState<SelectableModrinthVersion[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [matchingPlatformOnly, setMatchingPlatformOnly] = useState(false);
+    const visibleVersions = matchingPlatformOnly
+        ? versions.filter(version => matchesPlatform(version, matchVersion))
+        : versions;
 
     useEffect(() => {
         let active = true;
@@ -176,11 +182,16 @@ export function VersionResults({ project, onBack, onSelect, excludeFileId, match
                 <Avatar crossOrigin="anonymous" shape="square" src={project.icon_url || undefined}>{project.title[0]}</Avatar>
                 <Title level={4} style={{ margin: 0 }}>{project.title}</Title>
             </Flex>
+            {allowPlatformFilter && matchVersion && (
+                <Checkbox checked={matchingPlatformOnly} onChange={event => setMatchingPlatformOnly(event.target.checked)}>
+                    Only show releases matching the current platform
+                </Checkbox>
+            )}
             {error && <Alert type="error" showIcon message={error} />}
             <Spin spinning={loading}>
-                {versions.length > 0 ? (
+                {visibleVersions.length > 0 ? (
                     <List className="modrinth-version-list"
-                        dataSource={versions}
+                        dataSource={visibleVersions}
                         renderItem={version => {
                             const matches = matchesPlatform(version, matchVersion);
                             return <List.Item className="modrinth-version-list-item">
@@ -208,7 +219,9 @@ export function VersionResults({ project, onBack, onSelect, excludeFileId, match
                             </List.Item>
                         }}
                     />
-                ) : !loading && !error ? <Empty description="This project has no primary JAR releases." /> : null}
+                ) : !loading && !error ? (
+                    <Empty description={matchingPlatformOnly ? "No other releases match the current platform." : "This project has no primary JAR releases."} />
+                ) : null}
             </Spin>
         </Flex>
     );
