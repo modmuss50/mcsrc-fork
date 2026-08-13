@@ -1,8 +1,8 @@
-import { BehaviorSubject, combineLatest, from, map, Observable, switchMap, shareReplay } from "rxjs";
-import { minecraftJar, minecraftJarPipeline, minecraftVersionIds, type MinecraftJar } from "./MinecraftApi";
+import { BehaviorSubject, EMPTY, catchError, combineLatest, filter, from, map, Observable, shareReplay, switchMap, tap } from "rxjs";
+import { loadModJar, modJar, type ModJar } from "./ModrinthApi";
 import { currentResult, decompileResultPipeline } from "./Decompiler";
 import { calculatedLineChanges } from "./LineChanges";
-import { diffLeftSelectedMinecraftVersion, diffView, selectedMinecraftVersion } from "./State";
+import { diffComparisonFileId, selectedModFileId, selectedModProjectId } from "./State";
 import type { DecompileResult } from "../workers/decompile/types";
 import { classNameFromClassFilePath, isClassFilePath, toClassFilePath, withoutClassExtension, type ClassFilePath, type ClassName } from "../utils/Names";
 
@@ -11,25 +11,35 @@ export interface EntryInfo {
 }
 
 export interface DiffSide {
-    selectedVersion: BehaviorSubject<string | null>;
-    jar: Observable<MinecraftJar>;
+    selectedFileId: BehaviorSubject<string | null>;
+    jar: Observable<ModJar>;
     entries: Observable<Map<ClassFilePath, EntryInfo>>;
     result: Observable<DecompileResult>;
 }
 
-export const leftDownloadProgress = new BehaviorSubject<number | undefined>(undefined);
+export const comparisonError = new BehaviorSubject<string | null>(null);
+
+export const comparisonModJar = combineLatest([
+    selectedModProjectId,
+    diffComparisonFileId,
+]).pipe(
+    filter((selection): selection is [string, string] => selection[0] !== null && selection[1] !== null),
+    tap(() => comparisonError.next(null)),
+    switchMap(([projectId, fileId]) => from(loadModJar(projectId, fileId)).pipe(
+        catchError((error: unknown) => {
+            comparisonError.next(error instanceof Error ? error.message : "Unable to open this comparison file.");
+            return EMPTY;
+        }),
+    )),
+    shareReplay({ bufferSize: 1, refCount: false }),
+);
 
 let leftDiff: DiffSide | null = null;
 export function getLeftDiff(): DiffSide {
     if (!leftDiff) {
         leftDiff = {} as DiffSide;
-        leftDiff.selectedVersion = diffLeftSelectedMinecraftVersion;
-        combineLatest([diffView, leftDiff.selectedVersion, minecraftVersionIds]).subscribe(([isDiffView, version, versions]) => {
-            if (isDiffView && !version && versions.length > 0) {
-                leftDiff!.selectedVersion.next(versions[1] || versions[0] || null);
-            }
-        });
-        leftDiff.jar = minecraftJarPipeline(leftDiff.selectedVersion);
+        leftDiff.selectedFileId = diffComparisonFileId;
+        leftDiff.jar = comparisonModJar;
         leftDiff.entries = leftDiff.jar.pipe(
             switchMap(jar => from(getEntriesWithCRC(jar)))
         );
@@ -42,9 +52,9 @@ let rightDiff: DiffSide | null = null;
 export function getRightDiff(): DiffSide {
     if (!rightDiff) {
         rightDiff = {
-            selectedVersion: selectedMinecraftVersion,
-            jar: minecraftJar,
-            entries: minecraftJar.pipe(
+            selectedFileId: selectedModFileId,
+            jar: modJar,
+            entries: modJar.pipe(
                 switchMap(jar => from(getEntriesWithCRC(jar)))
             ),
             result: currentResult
@@ -71,8 +81,8 @@ function ensureClearLineChangesSubscription() {
     clearLineChangesSubscriptionStarted = true;
 
     combineLatest([
-        diffLeftSelectedMinecraftVersion,
-        selectedMinecraftVersion
+        diffComparisonFileId,
+        selectedModFileId
     ]).subscribe(() => {
         calculatedLineChanges.next(new Map());
     });
@@ -124,7 +134,7 @@ export function getDiffSummary(): Observable<DiffSummary> {
 
 export type ChangeState = "added" | "deleted" | "modified";
 
-async function getEntriesWithCRC(jar: MinecraftJar): Promise<Map<ClassFilePath, EntryInfo>> {
+async function getEntriesWithCRC(jar: ModJar): Promise<Map<ClassFilePath, EntryInfo>> {
     const entries = new Map<ClassFilePath, EntryInfo>();
 
     for (const [path, file] of Object.entries(jar.jar.entries)) {

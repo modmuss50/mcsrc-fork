@@ -1,10 +1,11 @@
 import { MenuFoldOutlined } from "@ant-design/icons";
-import { Button, Drawer, Empty, Flex, Splitter, Tooltip, Typography } from "antd";
+import { Alert, Button, Drawer, Empty, Flex, Splitter, Tooltip, Typography } from "antd";
 import { useEffect } from "react";
 import { skip } from "rxjs";
 import { isThin } from "../../logic/Browser";
 import {
     getDiffSummary,
+    comparisonError,
     type DiffSummary,
 } from "../../logic/Diff";
 import { diffView, mobileDrawerOpen, selectedFile } from "../../logic/State";
@@ -14,6 +15,7 @@ import DiffCode from "./DiffCode";
 import { DiffNavigationButtons, DiffViewModeButtons } from "./DiffViewActions";
 import DiffViewFileList from "./DiffViewFileList";
 import DiffVersionSelection from "./DiffVersionSelection";
+import { comparisonSelectionOpen } from "../ComparisonSelectionModal";
 
 const { Text, Title } = Typography;
 
@@ -112,6 +114,7 @@ type SidebarCloseAction = "close" | "exit";
 
 const DiffSidebar = ({ closeAction = "exit" }: { closeAction?: SidebarCloseAction }) => {
     const summary = useObservable<DiffSummary>(getDiffSummary());
+    const error = useObservable(comparisonError);
 
     return (
         <aside style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -126,6 +129,14 @@ const DiffSidebar = ({ closeAction = "exit" }: { closeAction?: SidebarCloseActio
                 <div style={{ display: "flex", justifyContent: "center", overflowX: "hidden" }}>
                     <DiffVersionSelection />
                 </div>
+                {error && (
+                    <Alert
+                        type="error"
+                        showIcon
+                        message={error}
+                        action={<Button size="small" onClick={() => comparisonSelectionOpen.next("left")}>Choose release</Button>}
+                    />
+                )}
                 <DiffActions />
             </Flex>
             <DiffViewFileList />

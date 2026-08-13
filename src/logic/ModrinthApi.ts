@@ -179,7 +179,7 @@ async function downloadModFile(file: ModrinthFile): Promise<Blob> {
     return blob;
 }
 
-async function loadModJar(projectId: string, fileId: string): Promise<ModJar> {
+export async function loadModJar(projectId: string, fileId: string): Promise<ModJar> {
     const [project, versions] = await Promise.all([
         getModrinthProject(projectId),
         getModrinthProjectVersions(projectId),

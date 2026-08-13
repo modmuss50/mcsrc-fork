@@ -20,6 +20,7 @@ import {
     getSelectableVersions,
     searchModrinthProjects,
     type ModrinthProject,
+    type ModrinthVersion,
     type SelectableModrinthVersion,
 } from "../logic/ModrinthApi";
 import { selectModArtifact } from "../logic/State";
@@ -138,10 +139,18 @@ function ProjectResults({ onSelect }: { onSelect: (project: ModrinthProject) => 
     );
 }
 
-function VersionResults({ project, onBack, onSelect }: {
+function matchesPlatform(version: ModrinthVersion, reference?: ModrinthVersion): boolean {
+    if (!reference) return false;
+    return version.loaders.some(loader => reference.loaders.includes(loader))
+        && version.game_versions.some(gameVersion => reference.game_versions.includes(gameVersion));
+}
+
+export function VersionResults({ project, onBack, onSelect, excludeFileId, matchVersion }: {
     project: ModrinthProject;
-    onBack: () => void;
-    onSelect: () => void;
+    onBack?: () => void;
+    onSelect: (version: SelectableModrinthVersion) => void;
+    excludeFileId?: string;
+    matchVersion?: ModrinthVersion;
 }) {
     const [versions, setVersions] = useState<SelectableModrinthVersion[]>([]);
     const [loading, setLoading] = useState(true);
@@ -151,19 +160,19 @@ function VersionResults({ project, onBack, onSelect }: {
         let active = true;
         setLoading(true);
         void getModrinthProjectVersions(project.project_id).then(result => {
-            if (active) setVersions(getSelectableVersions(result));
+            if (active) setVersions(getSelectableVersions(result).filter(version => version.primaryFile.id !== excludeFileId));
         }).catch(versionError => {
             if (active) setError(versionError instanceof Error ? versionError.message : "Unable to load releases.");
         }).finally(() => {
             if (active) setLoading(false);
         });
         return () => { active = false; };
-    }, [project.project_id]);
+    }, [excludeFileId, project.project_id]);
 
     return (
         <Flex vertical gap={12} className="modrinth-version-picker">
             <Flex align="center" gap={8}>
-                <Button aria-label="Back to mod search" icon={<ArrowLeftOutlined />} onClick={onBack} />
+                {onBack && <Button aria-label="Back to mod search" icon={<ArrowLeftOutlined />} onClick={onBack} />}
                 <Avatar crossOrigin="anonymous" shape="square" src={project.icon_url || undefined}>{project.title[0]}</Avatar>
                 <Title level={4} style={{ margin: 0 }}>{project.title}</Title>
             </Flex>
@@ -172,31 +181,32 @@ function VersionResults({ project, onBack, onSelect }: {
                 {versions.length > 0 ? (
                     <List className="modrinth-version-list"
                         dataSource={versions}
-                        renderItem={version => (
-                            <List.Item className="modrinth-version-list-item">
+                        renderItem={version => {
+                            const matches = matchesPlatform(version, matchVersion);
+                            return <List.Item className="modrinth-version-list-item">
                                 <button
-                                className="modrinth-version-row"
+                                className={`modrinth-version-row${matches ? " modrinth-version-row-match" : ""}`}
                                 aria-label={`Open ${version.name}`}
-                                onClick={() => {
-                                    selectModArtifact(project.project_id, version.primaryFile.id);
-                                    onSelect();
-                                }}
+                                onClick={() => onSelect(version)}
                                 >
                                 <Flex vertical style={{ width: "100%" }}>
                                     <Flex justify="space-between" gap={12}>
                                         <Text strong>{version.name}</Text>
-                                        <Tag color={version.version_type === "release" ? "green" : "gold"}>{version.version_type}</Tag>
+                                        <Space size={4}>
+                                            {matches && <Tag color="blue">Matching platform</Tag>}
+                                            <Tag color={version.version_type === "release" ? "green" : "gold"}>{version.version_type}</Tag>
+                                        </Space>
                                     </Flex>
                                     <Text type="secondary">{version.version_number} · {version.primaryFile.filename} · {formatBytes(version.primaryFile.size)}</Text>
                                     <Space size={[4, 4]} wrap style={{ marginTop: 4 }}>
-                                        {version.loaders.map(loader => <Tag key={loader}>{loader}</Tag>)}
-                                        {version.game_versions.map(gameVersion => <Tag key={gameVersion}>{gameVersion}</Tag>)}
+                                        {version.loaders.map(loader => <Tag color={matchVersion?.loaders.includes(loader) ? "blue" : undefined} key={loader}>{loader}</Tag>)}
+                                        {version.game_versions.map(gameVersion => <Tag color={matchVersion?.game_versions.includes(gameVersion) ? "blue" : undefined} key={gameVersion}>{gameVersion}</Tag>)}
                                         <Text type="secondary">{new Date(version.date_published).toLocaleDateString()}</Text>
                                     </Space>
                                 </Flex>
                                 </button>
                             </List.Item>
-                        )}
+                        }}
                     />
                 ) : !loading && !error ? <Empty description="This project has no primary JAR releases." /> : null}
             </Spin>
@@ -207,7 +217,14 @@ function VersionResults({ project, onBack, onSelect }: {
 export function ModrinthSelector({ onSelect = () => undefined }: { onSelect?: () => void }) {
     const [project, setProject] = useState<ModrinthProject | null>(null);
     return project
-        ? <VersionResults project={project} onBack={() => setProject(null)} onSelect={onSelect} />
+        ? <VersionResults
+            project={project}
+            onBack={() => setProject(null)}
+            onSelect={version => {
+                selectModArtifact(project.project_id, version.primaryFile.id);
+                onSelect();
+            }}
+        />
         : <ProjectResults onSelect={setProject} />;
 }
 

@@ -310,6 +310,16 @@ html, body, #root {
   outline: none;
 }
 
+.modrinth-version-row-match {
+  background: var(--ant-color-info-bg);
+  box-shadow: inset 3px 0 0 var(--ant-color-info);
+}
+
+.modrinth-version-row-match:hover,
+.modrinth-version-row-match:focus-visible {
+  background: var(--ant-color-info-bg-hover);
+}
+
 @media (max-width: 600px) {
   .modsrc-welcome {
     padding: 56px 14px 28px;

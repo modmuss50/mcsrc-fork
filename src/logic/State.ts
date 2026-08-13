@@ -39,6 +39,7 @@ export const selectedLines = new BehaviorSubject<SelectedLines | null>(initialSt
 
 export const diffView = new BehaviorSubject<boolean>(!!initialState.diff);
 export const diffLeftSelectedMinecraftVersion = new BehaviorSubject<string | null>(initialState.diff?.leftMinecraftVersion ?? null);
+export const diffComparisonFileId = new BehaviorSubject<string | null>(null);
 
 // Reset selected lines when file changes (skip initial emission to preserve permalink selection)
 selectedFile.pipe(pairwise()).subscribe(([previousFile, currentFile]) => {
@@ -49,6 +50,14 @@ selectedFile.pipe(pairwise()).subscribe(([previousFile, currentFile]) => {
 
 combineLatest([selectedModProjectId, selectedModFileId]).pipe(pairwise()).subscribe(([previous, current]) => {
     if (previous[0] === current[0] && previous[1] === current[1]) return;
+    const changingRightDiffRelease = diffView.value
+        && previous[0] === current[0]
+        && previous[1] !== null
+        && current[1] !== null;
+    if (!changingRightDiffRelease) {
+        diffView.next(false);
+        diffComparisonFileId.next(null);
+    }
     selectedFile.next(undefined);
     openTab.next(null);
     openTabs.next([]);

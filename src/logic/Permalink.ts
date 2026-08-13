@@ -1,6 +1,6 @@
 import { combineLatest } from "rxjs";
 import { resetPermalinkAffectingSettings, supportsPermalinking } from "./Settings";
-import { selectedFile, selectedLines, selectedModFileId, selectedModProjectId } from "./State";
+import { diffView, selectedFile, selectedLines, selectedModFileId, selectedModProjectId } from "./State";
 import { toClassFilePath, withoutClassExtension, type ClassFilePath } from "../utils/Names";
 
 export interface State {
@@ -97,14 +97,23 @@ if (typeof window !== "undefined") {
             selectedModFileId,
             selectedFile,
             selectedLines,
-            supportsPermalinking
+            supportsPermalinking,
+            diffView,
         ]).subscribe(([
             projectId,
             fileId,
             file,
             selectedLines,
-            supported
+            supported,
+            comparing,
         ]) => {
+            if (comparing) {
+                document.title = "Compare · modsrc.dev";
+                window.location.hash = '';
+                window.history.replaceState({}, '', '/');
+                return;
+            }
+
             if (!projectId || !fileId) {
                 document.title = "modsrc.dev";
                 window.location.hash = '';

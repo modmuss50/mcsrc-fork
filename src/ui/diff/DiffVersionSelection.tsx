@@ -1,25 +1,27 @@
-import { Flex, Button, Tooltip } from "antd";
-import { SwapOutlined } from "@ant-design/icons";
+import { Button, Flex, Tooltip, Typography } from "antd";
 import { getLeftDiff, getRightDiff } from "../../logic/Diff";
-import VersionSelector from "../VersionSelector";
+import { useObservable } from "../../utils/UseObservable";
+import { comparisonSelectionOpen } from "../ComparisonSelectionModal";
+
+const { Text } = Typography;
 
 const DiffVersionSelection = () => {
+    const comparison = useObservable(getLeftDiff().jar);
+    const current = useObservable(getRightDiff().jar);
+
     return (
-        <Flex align="center" gap={8}>
-            <VersionSelector selectedVersion={getLeftDiff().selectedVersion} minWidth={96} />
-            <Tooltip title="Swap versions">
-                <Button
-                    icon={<SwapOutlined />}
-                    size="small"
-                    onClick={() => {
-                        const left = getLeftDiff().selectedVersion.getValue();
-                        const right = getRightDiff().selectedVersion.getValue();
-                        getLeftDiff().selectedVersion.next(right);
-                        getRightDiff().selectedVersion.next(left);
-                    }}
-                />
+        <Flex align="center" gap={8} style={{ minWidth: 0 }}>
+            <Tooltip title={comparison?.file.filename ?? "Choose a comparison release"}>
+                <Button size="small" onClick={() => comparisonSelectionOpen.next("left")}>
+                    {comparison?.version.version_number ?? "Choose release"}
+                </Button>
             </Tooltip>
-            <VersionSelector selectedVersion={getRightDiff().selectedVersion} minWidth={96} />
+            <Text type="secondary">vs</Text>
+            <Tooltip title={current?.file.filename}>
+                <Button size="small" onClick={() => comparisonSelectionOpen.next("right")}>
+                    {current?.version.version_number ?? "Choose release"}
+                </Button>
+            </Tooltip>
         </Flex>
     );
 };
