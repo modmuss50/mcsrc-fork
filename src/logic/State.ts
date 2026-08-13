@@ -38,8 +38,7 @@ export interface SelectedLines {
 export const selectedLines = new BehaviorSubject<SelectedLines | null>(initialState.selectedLines);
 
 export const diffView = new BehaviorSubject<boolean>(!!initialState.diff);
-export const diffLeftSelectedMinecraftVersion = new BehaviorSubject<string | null>(initialState.diff?.leftMinecraftVersion ?? null);
-export const diffComparisonFileId = new BehaviorSubject<string | null>(null);
+export const diffComparisonFileId = new BehaviorSubject<string | null>(initialState.diff?.leftFileId ?? null);
 
 // Reset selected lines when file changes (skip initial emission to preserve permalink selection)
 selectedFile.pipe(pairwise()).subscribe(([previousFile, currentFile]) => {

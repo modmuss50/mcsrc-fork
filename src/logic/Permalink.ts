@@ -1,6 +1,6 @@
 import { combineLatest } from "rxjs";
 import { resetPermalinkAffectingSettings, supportsPermalinking } from "./Settings";
-import { diffView, selectedFile, selectedLines, selectedModFileId, selectedModProjectId } from "./State";
+import { diffComparisonFileId, diffView, selectedFile, selectedLines, selectedModFileId, selectedModProjectId } from "./State";
 import { toClassFilePath, withoutClassExtension, type ClassFilePath } from "../utils/Names";
 
 export interface State {
@@ -12,7 +12,7 @@ export interface State {
         line: number;
         lineEnd?: number;
     } | null;
-    diff?: { leftMinecraftVersion: string };
+    diff?: { leftFileId: string };
 }
 
 const DEFAULT_STATE: State = {
@@ -47,8 +47,12 @@ export const parsePathToState = (path: string): State | null => {
     if (!Number.isInteger(version) || version !== 1) return null;
 
     const projectId = decodeURIComponent(segments[1]);
-    const fileId = decodeURIComponent(segments[2]);
-    const filePath = segments.slice(3).join('/');
+    const firstFileId = decodeURIComponent(segments[2]);
+    const hasDiffFileIds = segments.length >= 4
+        && /^[A-Za-z0-9]{8}$/.test(firstFileId)
+        && /^[A-Za-z0-9]{8}$/.test(decodeURIComponent(segments[3]));
+    const fileId = hasDiffFileIds ? decodeURIComponent(segments[3]) : firstFileId;
+    const filePath = segments.slice(hasDiffFileIds ? 4 : 3).join('/');
     if (!projectId || !fileId) return null;
 
     return {
@@ -56,7 +60,8 @@ export const parsePathToState = (path: string): State | null => {
         projectId,
         fileId,
         file: filePath ? toClassFilePath(filePath) : undefined,
-        selectedLines: lineNumber ? { line: lineNumber, lineEnd: lineEnd || undefined } : null
+        selectedLines: lineNumber ? { line: lineNumber, lineEnd: lineEnd || undefined } : null,
+        ...(hasDiffFileIds ? { diff: { leftFileId: firstFileId } } : {}),
     };
 };
 
@@ -99,6 +104,7 @@ if (typeof window !== "undefined") {
             selectedLines,
             supportsPermalinking,
             diffView,
+            diffComparisonFileId,
         ]).subscribe(([
             projectId,
             fileId,
@@ -106,11 +112,20 @@ if (typeof window !== "undefined") {
             selectedLines,
             supported,
             comparing,
+            comparisonFileId,
         ]) => {
             if (comparing) {
-                document.title = "Compare · modsrc.dev";
-                window.location.hash = '';
-                window.history.replaceState({}, '', '/');
+                const className = file ? withoutClassExtension(file.split('/').pop() || file) : null;
+                document.title = className ? `${className} · Compare` : "Compare · modsrc.dev";
+                if (!supported || !projectId || !comparisonFileId || !fileId) {
+                    window.location.hash = '';
+                    window.history.replaceState({}, '', '/');
+                    return;
+                }
+
+                let url = `/1/${encodeURIComponent(projectId)}/${encodeURIComponent(comparisonFileId)}/${encodeURIComponent(fileId)}`;
+                if (file) url += `/${withoutClassExtension(file)}`;
+                window.history.replaceState({}, '', url);
                 return;
             }
 
