@@ -14,6 +14,10 @@ export const classesList = fileList.pipe(
     map(files => files.filter((file): file is ClassFilePath => isClassFilePath(file) && !file.includes('$')))
 );
 
+export const nestedJarList = fileList.pipe(
+    map(files => files.filter(file => file.toLowerCase().endsWith('.jar')))
+);
+
 const debouncedSearchQuery: Observable<string> = searchQuery.pipe(
     throttleTime(200, asyncScheduler, { trailing: true }),
     distinctUntilChanged()

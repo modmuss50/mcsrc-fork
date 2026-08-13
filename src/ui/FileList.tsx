@@ -1,9 +1,9 @@
 // oxlint-disable typescript/no-base-to-string
 import { Tree, Dropdown, message } from 'antd';
 import type { TreeDataNode, TreeProps, MenuProps } from 'antd';
-import { CaretDownFilled } from '@ant-design/icons';
+import { CaretDownFilled, FileZipOutlined } from '@ant-design/icons';
 import { combineLatest, from, map, Observable, of, shareReplay, switchMap, startWith } from 'rxjs';
-import { classesList } from '../logic/JarFile';
+import { classesList, nestedJarList } from '../logic/JarFile';
 import { useObservable } from '../utils/UseObservable';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Key } from 'antd/es/table/interface';
@@ -36,20 +36,15 @@ const classData: Observable<Map<string, ClassData> | null> = combineLatest([
 
 const fileTree: Observable<TreeDataNode[]> = combineLatest([
     classesList,
+    nestedJarList,
     classData,
     compactPackages.observable
 ]).pipe(
-    map(([classNames, classData, compact]) => {
+    map(([classNames, nestedJars, classData, compact]) => {
         const dirs = new Map<string, TreeDataNode[]>();
         dirs.set('', []);
 
-        for (const classPath of classNames) {
-            if (classPath.includes('$')) continue;
-
-            const className = classNameFromClassFilePath(classPath);
-            const i = className.lastIndexOf('/');
-            const dirPath = className.slice(0, i);
-
+        const ensureDirectory = (dirPath: string) => {
             if (!dirs.has(dirPath)) {
                 const parts = dirPath.split('/');
                 parts.forEach((p, i) => {
@@ -68,6 +63,13 @@ const fileTree: Observable<TreeDataNode[]> = combineLatest([
                     };
                 });
             };
+        };
+
+        for (const classPath of classNames) {
+            const className = classNameFromClassFilePath(classPath);
+            const i = className.lastIndexOf('/');
+            const dirPath = className.slice(0, i);
+            ensureDirectory(dirPath);
 
             const data = classData?.get(className);
             dirs.get(dirPath)!.push({
@@ -77,6 +79,18 @@ const fileTree: Observable<TreeDataNode[]> = combineLatest([
                 icon: data
                     ? <ClassDataIcon data={data} style={{ fontSize: '16px' }} />
                     : <JavaIcon style={{ fontSize: '16px' }} />,
+            });
+        }
+
+        for (const jarPath of nestedJars) {
+            const i = jarPath.lastIndexOf('/');
+            const dirPath = jarPath.slice(0, i);
+            ensureDirectory(dirPath);
+            dirs.get(dirPath)!.push({
+                title: jarPath.slice(i + 1),
+                key: jarPath,
+                isLeaf: true,
+                icon: <FileZipOutlined style={{ fontSize: '16px' }} />,
             });
         }
 
@@ -239,12 +253,18 @@ const FileList = () => {
     const jar = useObservable(modJar);
     const selectedKeys = useObservable(selectedFileKeys);
     const classes = useObservable(classesList);
+    const nestedJars = useObservable(nestedJarList);
     const onSelect: TreeProps['onSelect'] = useCallback((selectedKeys: Key[]) => {
         if (selectedKeys.length === 0) return;
         const key = selectedKeys[0];
-        if (typeof key !== "string" || !isClassFilePath(key) || !classes.includes(key)) return;
+        if (typeof key !== "string") return;
+        if (nestedJars?.includes(key)) {
+            message.info('Embedded JARs are not supported yet.');
+            return;
+        }
+        if (!isClassFilePath(key) || !classes.includes(key)) return;
         openCodeTab(key);
-    }, [classes]);
+    }, [classes, nestedJars]);
 
     const treeData = useObservable(fileTree);
 
