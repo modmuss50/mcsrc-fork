@@ -1,4 +1,5 @@
 import { BehaviorSubject } from "rxjs";
+import { combineLatest } from "rxjs";
 import { pairwise } from "rxjs/operators";
 import { Tab, CodeTab } from "./tabs";
 import { getInitialState } from "./Permalink";
@@ -9,7 +10,17 @@ const initialState = getInitialState();
 
 /// All of the user controled global state should be defined here:
 
-export const selectedMinecraftVersion = new BehaviorSubject<string | null>(initialState.minecraftVersion);
+export const selectedModProjectId = new BehaviorSubject<string | null>(initialState.projectId);
+export const selectedModFileId = new BehaviorSubject<string | null>(initialState.fileId);
+
+export function selectModArtifact(projectId: string, fileId: string): void {
+    selectedModFileId.next(null);
+    selectedModProjectId.next(projectId);
+    selectedModFileId.next(fileId);
+}
+
+// Kept for the inactive legacy diff modules until they are removed completely.
+export const selectedMinecraftVersion = new BehaviorSubject<string | null>(null);
 
 export const mobileDrawerOpen = new BehaviorSubject(false);
 export const selectedFile = new BehaviorSubject<ClassFilePath | undefined>(initialState.file);
@@ -34,4 +45,14 @@ selectedFile.pipe(pairwise()).subscribe(([previousFile, currentFile]) => {
     if (previousFile !== currentFile) {
         selectedLines.next(null);
     }
+});
+
+combineLatest([selectedModProjectId, selectedModFileId]).pipe(pairwise()).subscribe(([previous, current]) => {
+    if (previous[0] === current[0] && previous[1] === current[1]) return;
+    selectedFile.next(undefined);
+    openTab.next(null);
+    openTabs.next([]);
+    tabHistory.next([]);
+    searchQuery.next("");
+    referencesQuery.next("");
 });

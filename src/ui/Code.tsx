@@ -1,7 +1,7 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { useObservable } from '../utils/UseObservable';
 import { currentResult, isDecompiling } from '../logic/Decompiler';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { editor, Range } from "monaco-editor";
 import { isDarkMode, isThin } from '../logic/Browser';
 import { classesList } from '../logic/JarFile';
@@ -33,7 +33,7 @@ import {
     pendingTokenJump
 } from './CodeExtensions';
 import { bytecode } from '../logic/Settings';
-import { selectedFile, diffView, openTabs, selectedLines, tabHistory, referencesQuery, mobileDrawerOpen } from '../logic/State';
+import { selectedFile, openTabs, selectedLines, tabHistory, referencesQuery, mobileDrawerOpen } from '../logic/State';
 import { toClassFilePath } from '../utils/Names';
 
 const IS_ANDROID_CHROME = /Android/.test(navigator.userAgent) && /Chrome/.test(navigator.userAgent);
@@ -58,7 +58,6 @@ const Code = () => {
 
     const [messageApi, contextHolder] = message.useMessage();
 
-    const [resetViewTrigger, setResetViewTrigger] = useState(false);
 
     function applyTokenDecorations(model: editor.ITextModel) {
         if (!decompileResult) return;
@@ -156,7 +155,7 @@ const Code = () => {
             hoverProvider.dispose();
             definitionProvider.dispose();
         };
-    }, [monaco, decompileResult, classList, resetViewTrigger, messageApi]);
+    }, [monaco, decompileResult, classList, messageApi]);
 
     if (ENABLE_JAVADOC_EDITOR) {
         useEffect(() => {
@@ -229,36 +228,8 @@ const Code = () => {
         }
     }, [decompileResult, nextReference]);
 
-    // Subscribe to tab changes and store model & viewstate of previously opened tab
-    useEffect(() => {
-        // Cache if diffview is opened and restore if it is closed;
-        const sub = diffView.subscribe((open) => {
-            const openTab = getOpenTab();
-            if (!(openTab instanceof CodeTab)) return;
-            if (open) {
-                openTab.onBlur();
-            } else {
-                if (!openTab) return;
-                selectedFile.next(openTab.key);
-
-                // While this is not perfect, it works because leaving the diff view
-                // makes the view invisible and doesn't apply any of the custom "extensions",
-                // manually forcing a rerender works ^-^
-                setTimeout(() => {
-                    setResetViewTrigger(!resetViewTrigger);
-                }, 100);
-            }
-        });
-
-        return () => {
-            sub.unsubscribe();
-        };
-        // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps
-    }, []);
-
     // Handles setting the model and viewstate of the editor
     useEffect(() => {
-        if (diffView.value) return;
         if (!monaco || !decompileResult) return;
 
         const tab = getOpenTab();
@@ -293,7 +264,7 @@ const Code = () => {
         }
         applyTokenDecorations(tab.model!);
         // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps
-    }, [decompileResult, resetViewTrigger, selectedLine, monaco]);
+    }, [decompileResult, selectedLine, monaco]);
 
     // Process pending token jumps after model is loaded
     useEffect(() => {

@@ -1,26 +1,11 @@
 import { theme } from "antd";
 import { useObservable } from "../utils/UseObservable";
-import { getDiffChanges } from "../logic/Diff";
-import { combineLatest, map, of, switchMap } from "rxjs";
-import { selectedFile, diffView } from "../logic/State";
+import { selectedFile } from "../logic/State";
 import { withoutClassExtension } from "../utils/Names";
-
-const changeInfoObs = diffView.pipe(
-    switchMap(isDiff => {
-        if (!isDiff) return of(null);
-
-        return combineLatest([selectedFile, getDiffChanges()]).pipe(map(([file, changes]) => {
-            if (!file) return null;
-
-            return changes.get(file) || null;
-        }));
-    })
-);
 
 export const FilepathHeader = () => {
     const { token } = theme.useToken();
     const info = useObservable(selectedFile);
-    const changeInfo = useObservable(changeInfoObs);
 
     return info && (
         <div style={{
@@ -46,16 +31,6 @@ export const FilepathHeader = () => {
                     </span>
                 ))}
             </div>
-            {changeInfo && (
-                <div style={{ display: "flex", gap: "4px", marginLeft: "8px" }}>
-                    {changeInfo.deletions !== undefined && changeInfo.deletions > 0 && (
-                        <span style={{ color: token.colorError, fontSize: '12px', fontWeight: 'bold' }}>-{changeInfo.deletions}</span>
-                    )}
-                    {changeInfo.additions !== undefined && changeInfo.additions > 0 && (
-                        <span style={{ color: token.colorSuccess, fontSize: '12px', fontWeight: 'bold' }}>+{changeInfo.additions}</span>
-                    )}
-                </div>
-            )}
         </div>
     );
 };

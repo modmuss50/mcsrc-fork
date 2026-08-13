@@ -6,12 +6,14 @@ import SettingsModal from "./SettingsModal";
 import StructureModal from "./StructureModal";
 import { JarDecompilerModal, JarDecompilerProgressModal } from "./JarDecompilerModal";
 import IndexProgressNotification from "./IndexProgressNotification";
+import { ModrinthSelectionModal } from "./ModrinthSelector";
 
 const Modals = () => {
     return (
         <>
             <IndexProgressNotification />
             <ProgressModal />
+            <ModrinthSelectionModal />
             {ENABLE_JAVADOC_EDITOR && <JavadocModal />}
             <AboutModal />
             <SettingsModal />

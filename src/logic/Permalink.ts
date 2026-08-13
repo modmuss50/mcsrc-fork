@@ -1,24 +1,24 @@
 import { combineLatest } from "rxjs";
 import { resetPermalinkAffectingSettings, supportsPermalinking } from "./Settings";
-import { diffLeftSelectedMinecraftVersion, diffView, selectedFile, selectedLines, selectedMinecraftVersion } from "./State";
+import { selectedFile, selectedLines, selectedModFileId, selectedModProjectId } from "./State";
 import { toClassFilePath, withoutClassExtension, type ClassFilePath } from "../utils/Names";
 
 export interface State {
     version: number; // Allows us to change the permalink structure in the future
-    minecraftVersion: string;
+    projectId: string;
+    fileId: string;
     file: ClassFilePath | undefined;
     selectedLines: {
         line: number;
         lineEnd?: number;
     } | null;
-    diff?: {
-        leftMinecraftVersion: string;
-    };
+    diff?: { leftMinecraftVersion: string };
 }
 
 const DEFAULT_STATE: State = {
     version: 0,
-    minecraftVersion: "",
+    projectId: "",
+    fileId: "",
     file: undefined,
     selectedLines: null
 };
@@ -38,39 +38,23 @@ export const parsePathToState = (path: string): State | null => {
 
     const segments = path.split('/').filter(s => s.length > 0);
 
-    if (segments.length < 2) {
+    if (segments.length < 3) {
         return null;
     }
 
     const version = parseInt(segments[0], 10);
 
-    if (segments[1] === 'diff') {
-        if (segments.length < 4) {
-            return null;
-        }
-        const leftMinecraftVersion = decodeURIComponent(segments[2]);
-        const rightMinecraftVersion = decodeURIComponent(segments[3]);
-        const filePath = segments.slice(4).join('/');
-        return {
-            version,
-            minecraftVersion: rightMinecraftVersion,
-            file: filePath ? toClassFilePath(filePath) : undefined,
-            selectedLines: null,
-            diff: { leftMinecraftVersion }
-        };
-    }
+    if (!Number.isInteger(version) || version !== 1) return null;
 
-    let minecraftVersion = decodeURIComponent(segments[1]);
-    const filePath = segments.slice(2).join('/');
-
-    // Backwards compatibility with the incorrect version name used previously
-    if (minecraftVersion == "25w45a") {
-        minecraftVersion = "25w45a_unobfuscated";
-    }
+    const projectId = decodeURIComponent(segments[1]);
+    const fileId = decodeURIComponent(segments[2]);
+    const filePath = segments.slice(3).join('/');
+    if (!projectId || !fileId) return null;
 
     return {
         version,
-        minecraftVersion,
+        projectId,
+        fileId,
         file: filePath ? toClassFilePath(filePath) : undefined,
         selectedLines: lineNumber ? { line: lineNumber, lineEnd: lineEnd || undefined } : null
     };
@@ -109,22 +93,20 @@ export const getInitialState = (): State => {
 if (typeof window !== "undefined") {
     window.addEventListener('load', () => {
         combineLatest([
-            selectedMinecraftVersion,
-            diffLeftSelectedMinecraftVersion,
+            selectedModProjectId,
+            selectedModFileId,
             selectedFile,
             selectedLines,
-            supportsPermalinking,
-            diffView
+            supportsPermalinking
         ]).subscribe(([
-            minecraftVersion,
-            diffLeftMinecraftVersion,
+            projectId,
+            fileId,
             file,
             selectedLines,
-            supported,
-            diffView
+            supported
         ]) => {
-            if (!file && !diffView) {
-                document.title = "mcsrc.dev";
+            if (!projectId || !fileId) {
+                document.title = "modsrc.dev";
                 window.location.hash = '';
                 window.history.replaceState({}, '', '/');
                 return;
@@ -134,7 +116,7 @@ if (typeof window !== "undefined") {
                 const className = withoutClassExtension(file.split('/').pop() || file);
                 document.title = className;
             } else {
-                document.title = "mcsrc.dev";
+                document.title = "modsrc.dev";
             }
 
             if (!supported) {
@@ -143,23 +125,14 @@ if (typeof window !== "undefined") {
                 return;
             }
 
-            let url = '/1/';
-
-            if (diffView) {
-                url += `diff/${diffLeftMinecraftVersion}/${minecraftVersion}`;
-                if (file) {
-                    url += `/${withoutClassExtension(file)}`;
-                }
-            } else {
-                url += `${minecraftVersion}/${withoutClassExtension(file!)}`;
-
+            let url = `/1/${encodeURIComponent(projectId)}/${encodeURIComponent(fileId)}`;
+            if (file) {
+                url += `/${withoutClassExtension(file)}`;
                 if (selectedLines) {
                     const { line, lineEnd } = selectedLines;
-                    if (lineEnd && lineEnd !== line) {
-                        url += `#L${Math.min(line, lineEnd)}-${Math.max(line, lineEnd)}`;
-                    } else {
-                        url += `#L${line}`;
-                    }
+                    url += lineEnd && lineEnd !== line
+                        ? `#L${Math.min(line, lineEnd)}-${Math.max(line, lineEnd)}`
+                        : `#L${line}`;
                 }
             }
 

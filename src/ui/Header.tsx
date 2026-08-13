@@ -1,8 +1,9 @@
 import { Button, Divider, Flex, Tooltip } from "antd";
-import { SwapOutlined } from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
 import { SettingsModalButton } from "./SettingsModal";
-import VersionSelector from "./VersionSelector";
-import { diffView } from "../logic/State";
+import { modSelectionOpen } from "./ModrinthSelector";
+import { useObservable } from "../utils/UseObservable";
+import { modJar } from "../logic/ModrinthApi";
 
 const Header = () => {
     return (
@@ -18,17 +19,15 @@ const Header = () => {
 };
 
 const HeaderBody = () => {
+    const selected = useObservable(modJar);
     return (
         <Flex justify="center" align="center" gap={6} style={{ width: "max-content", minWidth: "100%" }}>
-            <div style={{ flex: "0 0 auto" }}>
-                <VersionSelector />
-            </div>
-            <Tooltip title="Compare versions">
+            <Tooltip title="Choose a Modrinth mod and release">
                 <Button
-                    icon={<SwapOutlined />}
-                    onClick={() => diffView.next(true)}
+                    icon={<SearchOutlined />}
+                    onClick={() => modSelectionOpen.next(true)}
                 >
-                    Compare
+                    {selected ? `${selected.project.title} · ${selected.version.version_number}` : "Choose mod"}
                 </Button>
             </Tooltip>
             <div style={{ flex: "0 0 auto" }}>

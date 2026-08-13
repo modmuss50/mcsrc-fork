@@ -1,12 +1,11 @@
-import { Button, Flex, Modal, type CheckboxProps, Form, Tooltip, InputNumber, type InputNumberProps, Space, Tabs } from "antd";
-import { SettingOutlined, SunOutlined, MoonOutlined, DesktopOutlined, JavaOutlined } from '@ant-design/icons';
+import { Button, Modal, type CheckboxProps, Form, Tooltip, InputNumber, type InputNumberProps, Space } from "antd";
+import { SettingOutlined, SunOutlined, MoonOutlined, DesktopOutlined } from '@ant-design/icons';
 import { Checkbox } from 'antd';
 import { useObservable } from "../utils/UseObservable";
 import { BooleanSetting, enableTabs, displayLambdas, focusSearch, KeybindSetting, type KeybindValue, bytecode, showStructure, NumberSetting, preferWasmDecompiler, compactPackages, theme, autoJarIndex } from "../logic/Settings";
 import { capturingKeybind, rawKeydownEvent } from "../logic/Keybinds";
 import { BehaviorSubject } from "rxjs";
-import React, { useEffect, useState } from "react";
-import { modalOpen } from "./JarDecompilerModal";
+import React from "react";
 
 export const settingsModalOpen = new BehaviorSubject<boolean>(false);
 
@@ -44,28 +43,8 @@ const SettingsTab = () => {
     );
 };
 
-const AdvancedTab = () => (
-    <Flex className="settings-tab-content" vertical align="flex-start" gap="small">
-        <Button
-            data-testid="jar-decompiler"
-            icon={<JavaOutlined />}
-            onClick={() => {
-                settingsModalOpen.next(false);
-                modalOpen.next(true);
-            }}
-        >
-            Decompile All
-        </Button>
-    </Flex>
-);
-
 const SettingsModal = () => {
     const isModalOpen = useObservable(settingsModalOpen);
-    const [activeTab, setActiveTab] = useState("settings");
-
-    useEffect(() => {
-        if (isModalOpen) setActiveTab("settings");
-    }, [isModalOpen]);
 
     return (
         <Modal
@@ -74,23 +53,7 @@ const SettingsModal = () => {
             onCancel={() => settingsModalOpen.next(false)}
             footer={null}
         >
-            <Tabs
-                className="settings-tabs"
-                activeKey={activeTab}
-                onChange={setActiveTab}
-                items={[
-                    {
-                        key: "settings",
-                        label: "Settings",
-                        children: <SettingsTab />,
-                    },
-                    {
-                        key: "advanced",
-                        label: "Advanced",
-                        children: <AdvancedTab />,
-                    },
-                ]}
-            />
+            <SettingsTab />
         </Modal>
     );
 };

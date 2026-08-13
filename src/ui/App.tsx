@@ -4,8 +4,7 @@ import SideBar from './SideBar.tsx';
 import { useEffect, useState } from 'react';
 import { useObservable } from '../utils/UseObservable.ts';
 import { isDarkMode, isThin } from '../logic/Browser.ts';
-import { diffView, mobileDrawerOpen, openTab, openTabs, selectedFile } from '../logic/State';
-import DiffView from './diff/DiffView.tsx';
+import { mobileDrawerOpen, openTab, openTabs, selectedFile, selectedModFileId, selectedModProjectId } from '../logic/State';
 import { FilepathHeader } from './FilepathHeader.tsx';
 import { enableTabs } from '../logic/Settings.ts';
 import { MenuFoldOutlined } from '@ant-design/icons';
@@ -18,8 +17,8 @@ import { InheritanceView } from './inheritance/InheritanceView.tsx';
 const App = () => {
     const darkMode = useObservable(isDarkMode);
     const isSmall = useObservable(isThin);
-    const enableDiff = useObservable(diffView);
-
+    const projectId = useObservable(selectedModProjectId);
+    const fileId = useObservable(selectedModFileId);
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
     }, [darkMode]);
@@ -39,7 +38,7 @@ const App = () => {
             }}
         >
             <Modals />
-            {enableDiff ? <DiffView /> : isSmall ? <MobileApp /> : <LargeApp />}
+            {!projectId || !fileId ? <EmptyState /> : isSmall ? <MobileApp /> : <LargeApp />}
         </ConfigProvider>
     );
 };

@@ -8,7 +8,7 @@ import { useObservable } from '../utils/UseObservable';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Key } from 'antd/es/table/interface';
 import { openCodeTab } from '../logic/tabs';
-import { minecraftJar, type MinecraftJar } from '../logic/MinecraftApi';
+import { modJar, type ModJar } from '../logic/ModrinthApi';
 import { decompileClass, getDecompilerOptions } from '../logic/Decompiler';
 import { selectedFile, referencesQuery } from '../logic/State';
 import { autoJarIndex, compactPackages, displayLambdas } from '../logic/Settings';
@@ -125,7 +125,7 @@ function getPathKeys(filePath: string): Key[] {
     return result;
 }
 
-const handleCopyContent = async (path: ClassFilePath, jar: MinecraftJar) => {
+const handleCopyContent = async (path: ClassFilePath, jar: ModJar) => {
     try {
         message.loading({ content: 'Decompiling...', key: 'copy-content' });
         await setOptions(getDecompilerOptions(displayLambdas.value));
@@ -148,7 +148,7 @@ interface ContextMenuInfo {
 const getMenuItems = (
     contextMenu: ContextMenuInfo | null,
     handleCopyItem: (path: ClassFilePath) => void,
-    jar: MinecraftJar | undefined
+    jar: ModJar | undefined
 ): MenuProps['items'] => {
     if (!contextMenu) return [];
 
@@ -157,7 +157,7 @@ const getMenuItems = (
     const packagePath = isFile ? dottedClassNameFromClassName(classNameFromClassFilePath(path)) : withoutClassExtension(path);
     const filename = path.split('/').pop() || '';
     const linkPath = withoutClassExtension(path);
-    const link = jar ? `https://mcsrc.dev/1/${jar.version}/${linkPath}` : '';
+    const link = jar ? `https://modsrc.dev/1/${jar.project.project_id}/${jar.file.id}/${linkPath}` : '';
 
     const renderLabel = (title: string, value: string) => (
         <div style={{ display: 'flex', gap: '24px', justifyContent: 'space-between', alignItems: 'center', minWidth: '300px' }}>
@@ -236,7 +236,7 @@ const FileList = () => {
     const [expandedKeys, setExpandedKeys] = useState<Key[]>();
     const [contextMenu, setContextMenu] = useState<ContextMenuInfo | null>(null);
 
-    const jar = useObservable(minecraftJar);
+    const jar = useObservable(modJar);
     const selectedKeys = useObservable(selectedFileKeys);
     const classes = useObservable(classesList);
     const onSelect: TreeProps['onSelect'] = useCallback((selectedKeys: Key[]) => {
@@ -249,14 +249,14 @@ const FileList = () => {
     const treeData = useObservable(fileTree);
 
     useEffect(() => {
-        if (expandedKeys === undefined) {
+        if (expandedKeys === undefined || (expandedKeys.length === 0 && !selectedKeys?.[0])) {
             if (selectedKeys?.[0]) {
                 setExpandedKeys(getPathKeys(selectedKeys[0] as string));
-            } else {
-                setExpandedKeys(['net', 'net/minecraft']);
+            } else if (classes?.length) {
+                setExpandedKeys([...new Set(classes.flatMap(classPath => getPathKeys(classPath).slice(0, 2)))]);
             }
         }
-    }, [expandedKeys, selectedKeys]);
+    }, [classes, expandedKeys, selectedKeys]);
 
     useEffect(() => {
         if (selectedKeys?.[0] && expandedKeys !== undefined) {

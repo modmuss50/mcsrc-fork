@@ -1,213 +1,81 @@
-import React from "react";
-import { GithubOutlined, SearchOutlined, LinkOutlined, BranchesOutlined, CopyOutlined, CodeOutlined, AimOutlined } from '@ant-design/icons';
-import { Card, Typography, Space, Tooltip, theme } from 'antd';
-import { classesList } from "../logic/JarFile";
-import { openCodeTab } from "../logic/tabs";
+import { Alert, Button, Card, Flex, Spin, Typography } from "antd";
 import { useObservable } from "../utils/UseObservable";
+import { artifactError, modJar } from "../logic/ModrinthApi";
+import { classesList } from "../logic/JarFile";
+import { selectedModFileId, selectedModProjectId } from "../logic/State";
+import { openCodeTab } from "../logic/tabs";
+import { ModrinthSelector, modSelectionOpen } from "./ModrinthSelector";
+import { SettingsModalButton } from "./SettingsModal";
 
-const { Title, Paragraph } = Typography;
-const { useToken } = theme;
+const { Paragraph, Title } = Typography;
 
 export const EmptyState = () => {
-    const { token } = useToken();
-    const outerClasses = useObservable(classesList);
+    const projectId = useObservable(selectedModProjectId);
+    const fileId = useObservable(selectedModFileId);
+    const selectedJar = useObservable(modJar);
+    const classes = useObservable(classesList);
+    const error = useObservable(artifactError);
 
-    const openRandomClass = () => {
-        if (outerClasses && outerClasses.length > 0) {
-            const filteredClasses = outerClasses.filter(cls => !cls.endsWith('package-info.class'));
-            if (filteredClasses.length > 0) {
-                const randomIndex = Math.floor(Math.random() * filteredClasses.length);
-                openCodeTab(filteredClasses[randomIndex]);
-            }
-        }
-    };
-
-    const features = [
-        {
-            icon: <LinkOutlined style={{ fontSize: "18px", color: "#722ed1" }} />,
-            title: "Version Comparison",
-            description: "Select \"Compare\" in the version selection dropdown to compare two versions side by side and see what changed"
-        },
-        {
-            icon: <BranchesOutlined style={{ fontSize: "18px", color: "#eb2f96" }} />,
-            title: "Inheritance Visualization",
-            description: "Right-click anywhere in the class view and select 'Show Inheritance Hierarchy' to see a visual graph of the class's inheritance tree"
-        },
-        {
-            icon: <SearchOutlined style={{ fontSize: "18px", color: "#52c41a" }} />,
-            title: "Find References",
-            description: "Right-click on any declaration and select 'Find References' to see a list of all places that reference that class, method, or field"
-        },
-        {
-            icon: <AimOutlined style={{ fontSize: "18px", color: "#1890ff" }} />,
-            title: "Go to Declaration",
-            description: "Ctrl/Cmd + Click or right click and select 'Go to Declaration' on any class, method, or field to jump to its declaration site"
-        },
-        {
-            icon: <CopyOutlined style={{ fontSize: "18px", color: "#faad14" }} />,
-            title: "Mixin / Class Tweaker String",
-            description: "Right-click on any class, method, or field and select 'Copy Mixin Target' or 'Copy Class Tweaker Target' to copy a string you can use in your mixin or class tweaker configs"
-        },
-        {
-            icon: <CodeOutlined style={{ fontSize: "18px", color: "#f5222d" }} />,
-            title: "Bytecode View",
-            description: "In the settings menu enable \"Show Bytecode\" to see the java bytecode for the current class"
-        }
-    ];
-
-    return (
-        <div
-            style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                height: "100%",
-                color: token.colorText,
-                overflowY: "auto",
-                fontFamily: token.fontFamily
-            }}
-        >
-            <Space orientation="vertical" size="large" align="center" style={{ padding: "2rem", margin: "auto" }}>
-                <img
-                    src="/assets/mcsrc_favicon.svg"
-                    alt="mcsrc logo"
-                    style={{
-                        width: "120px",
-                        height: "120px"
-                    }}
-                />
-
-                <Paragraph style={{
-                    fontSize: "18px",
-                    marginBottom: 0,
-                    color: token.colorTextSecondary,
-                    textAlign: "center",
-                    fontWeight: "500",
-                }}>
-                    mcsrc.dev is a browser-based tool for viewing decompiled Minecraft Java Edition source code
-                </Paragraph>
-
-                <Paragraph style={{
-                    fontSize: "14px",
-                    marginBottom: 0,
-                    color: token.colorTextTertiary,
-                    textAlign: "center"
-                }}>
-                    Select a file from the tree on the left to get started, or{" "}
-                    <a
-                        onClick={openRandomClass}
-                        style={{
-                            color: token.colorPrimary,
-                            cursor: "pointer",
-                            textDecoration: "underline"
-                        }}
-                    >
-                        open a random class
-                    </a>
-                </Paragraph>
-
-                <div style={{ width: "100%", maxWidth: "700px" }}>
-                    <Card
-                        style={{
-                            background: token.colorBgElevated,
-                            border: `1px solid ${token.colorBorderSecondary}`,
-                            marginBottom: "24px"
-                        }}
-                        styles={{ body: { padding: "1.5rem" } }}
-                    >
-                        <Title level={4} style={{
-                            marginTop: 0,
-                            marginBottom: "1rem",
-                            color: token.colorTextHeading
-                        }}>
-                            How It Works
-                        </Title>
-                        <ul style={{
-                            margin: 0,
-                            paddingLeft: "1.5rem",
-                            color: token.colorTextSecondary,
-                            lineHeight: "1.8"
-                        }}>
-                            <li>The Minecraft jar is downloaded directly from Mojang's servers to your device when you use this tool.</li>
-                            <li>Decompilation happens entirely in your browser</li>
-                            <li>No Minecraft code or bytecode is redistributed by this website</li>
-                            <li>Powered by the <a href="https://github.com/Vineflower/vineflower" target="_blank" rel="noreferrer" style={{ color: token.colorPrimary }}>Vineflower</a> decompiler via the <a href="https://www.npmjs.com/package/@run-slicer/vf" target="_blank" rel="noreferrer" style={{ color: token.colorPrimary }}>@run-slicer/vf</a> project</li>
-                        </ul>
-                    </Card>
-
+    if (!projectId || !fileId) {
+        return (
+            <div className="modsrc-welcome">
+                <div className="modsrc-landing-settings"><SettingsModalButton /></div>
+                <Flex vertical gap={18} className="modsrc-landing-content">
                     <div>
-                        <Title level={4} style={{
-                            marginTop: 0,
-                            marginBottom: "1rem",
-                            color: token.colorTextHeading
-                        }}>
-                            Features
-                        </Title>
-                        <div style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "0.75rem",
-                            margin: 0
-                        }}>
-                            {features.map((feature, index) => (
-                                <Tooltip key={index} title={feature.description} placement="top">
-                                    <div style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "0.5rem",
-                                        cursor: "help",
-                                        padding: "0.5rem",
-                                        borderRadius: "4px",
-                                        transition: "background 0.2s",
-                                        color: token.colorText
-                                    }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = token.colorBgTextHover;
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = "transparent";
-                                        }}>
-                                        {feature.icon}
-                                        <span>
-                                            {feature.title}
-                                        </span>
-                                    </div>
-                                </Tooltip>
-                            ))}
-                        </div>
+                        <Title className="modsrc-title">modsrc.dev</Title>
+                        <Paragraph type="secondary" className="modsrc-subtitle">
+                            Find a mod on Modrinth and browse its decompiled Java source. Downloads and decompilation happen entirely in your browser.
+                        </Paragraph>
                     </div>
-                </div>
+                    <Card className="modsrc-search-card" styles={{ body: { padding: 20 } }}><ModrinthSelector /></Card>
+                    <Alert
+                        type="info"
+                        showIcon
+                        message="Proof of concept"
+                        description="This site is in the proof-of-concept stage. Features, links, and behavior may change."
+                    />
+                </Flex>
+            </div>
+        );
+    }
 
-                <a
-                    href="https://github.com/FabricMC/mcsrc"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                        color: token.colorText,
-                        textDecoration: "none",
-                        padding: "0.75rem 1.5rem",
-                        background: token.colorBgContainer,
-                        border: `1px solid ${token.colorBorder}`,
-                        borderRadius: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        transition: "all 0.2s",
-                        marginTop: "24px"
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background = token.colorBgTextHover;
-                        e.currentTarget.style.borderColor = token.colorBorderSecondary;
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background = token.colorBgContainer;
-                        e.currentTarget.style.borderColor = token.colorBorder;
-                    }}
-                >
-                    <GithubOutlined style={{ fontSize: "20px" }} />
-                    Star on GitHub
-                </a>
-            </Space>
+    if (error) {
+        return (
+            <div className="modsrc-welcome">
+                <Flex vertical gap={16} style={{ width: "min(680px, calc(100% - 32px))" }}>
+                    <Alert type="error" showIcon message="Unable to open this mod" description={error} />
+                    <Button type="primary" onClick={() => modSelectionOpen.next(true)}>Choose another mod</Button>
+                </Flex>
+            </div>
+        );
+    }
+
+    if (!selectedJar || !classes) {
+        return <div className="modsrc-welcome"><Spin size="large" tip="Loading mod JAR" /></div>;
+    }
+
+    if (classes.length === 0) {
+        return (
+            <div className="modsrc-welcome">
+                <Alert
+                    type="warning"
+                    showIcon
+                    message="No top-level classes found"
+                    description="This JAR may contain only nested JARs. Embedded JARs are not supported yet; choose a different release or mod."
+                    action={<Button onClick={() => modSelectionOpen.next(true)}>Choose another</Button>}
+                />
+            </div>
+        );
+    }
+
+    const openRandomClass = () => openCodeTab(classes[Math.floor(Math.random() * classes.length)]);
+    return (
+        <div className="modsrc-welcome">
+            <Flex vertical align="center" gap={8}>
+                <Title level={3}>{selectedJar.project.title}</Title>
+                <Paragraph type="secondary">Select a class from the tree, or open one at random.</Paragraph>
+                <Button onClick={openRandomClass}>Open random class</Button>
+            </Flex>
         </div>
     );
 };
