@@ -7,6 +7,8 @@ import { openJar } from "../../utils/Jar";
 import { JarIndexer } from "../jar-index/types";
 import { classNameFromDottedClassName, toClassName, type ClassName } from "../../utils/Names";
 
+const CACHE_DECOMPILED_RESULTS = false;
+
 export class DecompileWorker {
     #lastPromise: Promise<unknown> | undefined = undefined;
     #promiseCount = 0;
@@ -121,16 +123,19 @@ export class DecompileWorker {
                 const checksum = jar.proxy[className]?.checksum;
                 if (!checksum) continue;
 
-                const dbCount = await this.db.results5
-                    .where("[className+checksum+language+jarName]")
-                    .equals([className, checksum, "java", jarName])
-                    .count();
+                if (CACHE_DECOMPILED_RESULTS) {
+                    const dbCount = await this.db.results5
+                        .where("[className+checksum+language+jarName]")
+                        .equals([className, checksum, "java", jarName])
+                        .count();
 
-                if (dbCount >= 1) {
-                    nameLogger?.(className);
-                } else {
-                    targetClassNames.push(className);
+                    if (dbCount >= 1) {
+                        nameLogger?.(className);
+                        continue;
+                    }
                 }
+
+                targetClassNames.push(className);
             }
 
             try {
@@ -154,9 +159,11 @@ export class DecompileWorker {
     ): Promise<DecompileResult> => this.schedule(async () => {
         try {
             const jar = new DecompileJar(await openJar(jarName, jarBlob));
-            const checksum = jar.proxy[className]?.checksum;
-            const dbResult = await this.db.results5.get([className, checksum, "java", jarName]);
-            if (dbResult) return dbResult;
+            if (CACHE_DECOMPILED_RESULTS) {
+                const checksum = jar.proxy[className]?.checksum;
+                const dbResult = await this.db.results5.get([className, checksum, "java", jarName]);
+                if (dbResult) return dbResult;
+            }
 
             const result = await this.#decompile(jarName, jar.classes, [className], jar.proxy);
             return result[0];
@@ -274,7 +281,7 @@ export class DecompileWorker {
             res.push({ className, checksum, jarName, source, tokens, language: "java" });
         }
 
-        await this.db.results5.bulkPut(res);
+        if (CACHE_DECOMPILED_RESULTS) await this.db.results5.bulkPut(res);
         return res;
     }
 
