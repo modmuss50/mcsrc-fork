@@ -28,6 +28,9 @@ export const EmptyState = () => {
                         </Paragraph>
                     </div>
                     <Card className="modsrc-search-card" styles={{ body: { padding: 20 } }}><ModrinthSelector /></Card>
+                    <Paragraph type="secondary" style={{ margin: 0, textAlign: "center" }}>
+                        Powered by the <a href="https://github.com/Vineflower/vineflower">Vineflower</a> decompiler via the <a href="https://www.npmjs.com/package/@run-slicer/vf">@run-slicer/vf</a> project
+                    </Paragraph>
                     <Alert
                         type="info"
                         showIcon
