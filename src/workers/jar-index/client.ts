@@ -144,9 +144,10 @@ export class JarIndex {
         } catch (error) {
             // Reset promise on error so indexing can be retried
             this.indexPromise = null;
+            indexProgress.next(-1);
             throw error;
         } finally {
-            await Promise.all(this.workers.map(worker => worker.c.setJar("", null)));
+            await Promise.allSettled(this.workers.map(worker => worker.c.setJar("", null)));
         }
     }
 

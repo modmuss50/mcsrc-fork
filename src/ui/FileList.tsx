@@ -2,7 +2,7 @@
 import { Tree, Dropdown, message } from 'antd';
 import type { TreeDataNode, TreeProps, MenuProps } from 'antd';
 import { CaretDownFilled, FileZipOutlined } from '@ant-design/icons';
-import { combineLatest, from, map, Observable, of, shareReplay, switchMap, startWith } from 'rxjs';
+import { catchError, combineLatest, from, map, Observable, of, shareReplay, switchMap, startWith } from 'rxjs';
 import { classesList, nestedJarList } from '../logic/JarFile';
 import { useObservable } from '../utils/UseObservable';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -27,6 +27,10 @@ const classData: Observable<Map<string, ClassData> | null> = combineLatest([
                 map.set(data.className, data);
             }
             return map;
+        }),
+        catchError(error => {
+            console.warn('Unable to index this mod JAR; continuing without class metadata.', error);
+            return of(null);
         }),
         startWith(null)
     ) : of(null)),

@@ -8,9 +8,7 @@ export interface Jar {
 }
 
 export async function openJar(name: string, blob: Blob): Promise<Jar> {
-    const zip = await readBlob(blob, {
-        naive: true
-    });
+    const zip = await readBlob(blob);
     return new JarImpl(name, blob, zip);
 }
 
